@@ -181,22 +181,33 @@ object RecapPipeline {
         val transformer = Transformer.Builder(context)
             .setVideoMimeType(MimeTypes.VIDEO_H264)
             .setAudioMimeType(MimeTypes.AUDIO_AAC)
-            .build()
-        suspendCancellableCoroutine { cont ->
-            transformer.startComposition(composition, out.absolutePath, object : Transformer.Listener {
+            .addListener(object : Transformer.Listener {
                 override fun onCompleted(composition: Composition, exportResult: ExportResult) {
-                    if (cont.isActive) cont.resume(Unit)
+                    composeDone?.invoke(null)
                 }
 
                 override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) {
-                    if (cont.isActive) cont.resumeWithException(exportException)
+                    composeDone?.invoke(exportException)
                 }
             })
+            .build()
+        suspendCancellableCoroutine { cont ->
+            composeDone = { err: ExportException? ->
+                composeDone = null
+                if (err == null) {
+                    if (cont.isActive) cont.resume(Unit)
+                } else {
+                    if (cont.isActive) cont.resumeWithException(err)
+                }
+            }
+            transformer.start(composition, out.absolutePath)
             cont.invokeOnCancellation {
                 runCatching { transformer.cancel() }
             }
         }
     }
+
+    private var composeDone: ((ExportException?) -> Unit)? = null
 
     fun buildSrt(segments: List<Segment>, wavs: List<File>): String {
         val sb = StringBuilder()
