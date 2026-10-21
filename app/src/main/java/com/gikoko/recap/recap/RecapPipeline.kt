@@ -2,10 +2,13 @@ package com.gikoko.recap.recap
 
 import android.content.Context
 import android.net.Uri
+import android.text.SpannableString
+import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.TextOverlay
+import androidx.media3.effect.TextureOverlay
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
@@ -69,8 +72,10 @@ object RecapPipeline {
                 .build()
             val b = EditedMediaItem.Builder(mi).setRemoveAudio(true)
             if (wantCaptions) {
-                val overlay = TextOverlay.createStaticTextOverlay(seg.text)
-                b.setEffects(Effects(ImmutableList.of(OverlayEffect(ImmutableList.of(overlay))), ImmutableList.of()))
+                val overlay = TextOverlay.createStaticTextOverlay(SpannableString(seg.text))
+                val texList: ImmutableList<TextureOverlay> = ImmutableList.of(overlay)
+                val effectList: List<Effect> = ImmutableList.of(OverlayEffect(texList))
+                b.setEffects(Effects(ImmutableList.of(), effectList))
             }
             videoItems.add(b.build())
         }
@@ -170,9 +175,9 @@ object RecapPipeline {
         audioItems: List<EditedMediaItem>,
         out: File
     ) {
-        val videoSeq = EditedMediaItemSequence.Builder(ImmutableList.copyOf(videoItems)).build()
-        val audioSeq = EditedMediaItemSequence.Builder(ImmutableList.copyOf(audioItems)).build()
-        val composition = Composition.Builder(ImmutableList.of(videoSeq, audioSeq)).build()
+        val videoSeq = EditedMediaItemSequence(ImmutableList.copyOf(videoItems))
+        val audioSeq = EditedMediaItemSequence(ImmutableList.copyOf(audioItems))
+        val composition = Composition.Builder(videoSeq, audioSeq).build()
         val transformer = Transformer.Builder(context)
             .setVideoMimeType(MimeTypes.VIDEO_H264)
             .setAudioMimeType(MimeTypes.AUDIO_AAC)

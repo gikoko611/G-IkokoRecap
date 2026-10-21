@@ -3,9 +3,9 @@ package com.gikoko.recap.recap
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Layout
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import java.io.File
