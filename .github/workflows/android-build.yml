@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   build:
@@ -64,6 +65,8 @@ jobs:
           {
             echo "# CI build failed - debug log"
             echo
-            tail -n 300 build.log || true
+            tail -n 400 build.log || true
+            echo
+            grep -n -i "error\|FAILED" build.log | tail -n 40 || true
           } > /tmp/body.md
           gh issue create --title "CI build failed - debug log" --body-file /tmp/body.md || true
