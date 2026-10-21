@@ -91,7 +91,7 @@ class HomeActivity : AppCompatActivity() {
     private fun chipOf(text: String): Chip {
         val c = Chip(this)
         c.text = text
-        c.checkable = true
+        c.isCheckable = true
         c.isClickable = true
         c.chipBackgroundColor = ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
