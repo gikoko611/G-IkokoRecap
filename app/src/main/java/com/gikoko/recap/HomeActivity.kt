@@ -71,6 +71,7 @@ class HomeActivity : AppCompatActivity() {
         }
         buildDrawer(panel)
         buildUi(root)
+        maybeShowCrash()
     }
 
     override fun onResume() {
@@ -188,18 +189,39 @@ class HomeActivity : AppCompatActivity() {
             drawer.closeDrawer(Gravity.START)
             AlertDialog.Builder(this)
                 .setTitle("GIkoko One Recap")
-                .setMessage("Version 2.1 (Pro)\n\nAI video recap - Myanmar voice + captions.\nGemini 3.8 Flash + Custom REST provider.\nDeveloped by I Ko Ko.")
+                .setMessage("Version 2.1.1 (Pro)\n\nAI video recap - Myanmar voice + captions.\nGemini 3.8 Flash + Custom REST provider.\nDeveloped by I Ko Ko.")
                 .setPositiveButton("OK", null)
                 .show()
         })
 
         val foot = TextView(this)
-        foot.text = "v2.1 Pro"
+        foot.text = "v2.1.1 Pro"
         foot.textSize = 11f
         foot.setTextColor(Color.parseColor("#5A6480"))
         val fp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         fp.topMargin = dp(40)
         panel.addView(foot, fp)
+    }
+
+    private fun maybeShowCrash() {
+        val f = File(filesDir, "last_crash.txt")
+        if (!f.exists()) return
+        val txt = try { f.readText() } catch (e: Exception) { "" }
+        if (txt.isEmpty()) return
+        val show = if (txt.length > 2500) txt.substring(0, 2500) else txt
+        AlertDialog.Builder(this)
+            .setTitle("ယခင် Crash Report")
+            .setMessage(show)
+            .setPositiveButton("SHARE") { _, _ ->
+                val send = Intent(Intent.ACTION_SEND)
+                send.type = "text/plain"
+                send.putExtra(Intent.EXTRA_TEXT, txt)
+                startActivity(Intent.createChooser(send, "Crash Report"))
+            }
+            .setNegativeButton("ဖျက်မည်") { _, _ ->
+                f.delete()
+            }
+            .show()
     }
 
     private fun refreshStatus() {
@@ -460,7 +482,7 @@ class HomeActivity : AppCompatActivity() {
         beat.start()
 
         val ver = TextView(this)
-        ver.text = "GIkoko One Recap v2.1 Pro \u2022 powered by Gemini 3.8"
+        ver.text = "GIkoko One Recap v2.1.1 Pro \u2022 powered by Gemini 3.8"
         ver.gravity = Gravity.CENTER
         ver.setTextColor(Color.parseColor("#5A6480"))
         ver.textSize = 11f
