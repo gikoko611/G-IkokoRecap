@@ -111,7 +111,12 @@ class ProcessingActivity : AppCompatActivity() {
             Prefs.style(this),
             Prefs.speed(this),
             Prefs.customStyle(this),
-            Prefs.vertical(this)
+            Prefs.vertical(this),
+            Prefs.extBase(this),
+            Prefs.extKey(this),
+            Prefs.extModel(this),
+            Prefs.transcriptMode(this),
+            Prefs.transcriptFallback(this)
         )
         val source = intent.getStringExtra("source") ?: "youtube"
         val url = intent.getStringExtra("url") ?: ""

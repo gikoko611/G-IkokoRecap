@@ -38,6 +38,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var modelStatus: TextView
     private lateinit var customCard: LinearLayout
     private val geminiModelCards = ArrayList<LinearLayout>()
+    private lateinit var extKeyInput: EditText
+    private lateinit var extModelInput: EditText
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -394,6 +396,83 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
         root.addView(customCard)
+
+        val ct = card()
+        ct.addView(sectionTitle("TRANSCRIPT MODE - FREE TEXT MODELS"))
+        ct.addView(switchRow("Gemini quota ကုန်ရင် transcript နဲ့ auto-fallback", Prefs.KEY_TRANSCRIPT_FALLBACK, true))
+        val spCT = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        spCT.topMargin = dp(10)
+        ct.addView(switchRow("YouTube recap ကို transcript mode နဲ့ အမြဲလုပ်မည်", Prefs.KEY_TRANSCRIPT_MODE, false), spCT)
+        val presetGroup = ChipGroup(this)
+        presetGroup.isSingleSelection = true
+        val presetNames = listOf("OpenRouter", "Groq", "ModelScope")
+        val presetUrls = listOf("https://openrouter.ai/api/v1", "https://api.groq.com/openai/v1", "https://api-inference.modelscope.cn/v1")
+        val presetHints = listOf("deepseek/deepseek-chat-v3.1:free", "llama-3.3-70b-versatile", "Qwen/Qwen3.5-27B")
+        presetNames.forEachIndexed { i, s ->
+            val ch = chipOf(s)
+            ch.id = 41000 + i
+            ch.setOnCheckedChangeListener { _, checked ->
+                if (checked) {
+                    Prefs.save(this, Prefs.KEY_EXT_BASE, presetUrls[i])
+                    extModelInput.hint = "model name (ဥပမာ " + presetHints[i] + ")"
+                }
+            }
+            presetGroup.addView(ch)
+        }
+        val pIdx = presetUrls.indexOf(Prefs.extBase(this))
+        if (pIdx >= 0) presetGroup.check(41000 + pIdx)
+        ct.addView(presetGroup, spCT)
+        extKeyInput = EditText(this)
+        extKeyInput.hint = "Fallback provider API key"
+        inputStyle(extKeyInput)
+        val savedEk = Prefs.extKey(this)
+        if (savedEk.isNotEmpty()) extKeyInput.setText(savedEk)
+        ct.addView(extKeyInput, spCT)
+        extModelInput = EditText(this)
+        extModelInput.hint = "model name (ဥပမာ deepseek/deepseek-chat-v3.1:free)"
+        inputStyle(extModelInput)
+        val savedEm = Prefs.extModel(this)
+        if (savedEm.isNotEmpty()) extModelInput.setText(savedEm)
+        ct.addView(extModelInput, spCT)
+        val rowCT = LinearLayout(this)
+        rowCT.orientation = LinearLayout.HORIZONTAL
+        val rpCT = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        rpCT.topMargin = dp(10)
+        ct.addView(rowCT, rpCT)
+        val saveCT = flatBtn("SAVE", R.drawable.bg_gold_btn, "#0A0A00")
+        val testCT = flatBtn("TEST KEY", R.drawable.bg_chip_selected, "#F2F5FF")
+        rowCT.addView(saveCT, btnParams())
+        rowCT.addView(testCT, btnParams())
+        saveCT.setOnClickListener {
+            Prefs.save(this, Prefs.KEY_EXT_KEY, extKeyInput.text.toString().trim())
+            Prefs.save(this, Prefs.KEY_EXT_MODEL, extModelInput.text.toString().trim())
+            Toast.makeText(this, "သိမ်းပြီးပါပြီ", Toast.LENGTH_SHORT).show()
+        }
+        testCT.setOnClickListener {
+            val b = Prefs.extBase(this)
+            val k = extKeyInput.text.toString().trim()
+            if (k.isEmpty()) {
+                Toast.makeText(this, "API key ထည့်ပေးပါ", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+            Prefs.save(this, Prefs.KEY_EXT_KEY, k)
+            Toast.makeText(this, "စစ်ဆေးနေသည်...", Toast.LENGTH_SHORT).show()
+            lifecycleScope.launch {
+                try {
+                    val r = withContext(Dispatchers.IO) { GeminiClient.testKeyCustom(b, k) }
+                    Toast.makeText(this@SettingsActivity, "Key မှန်ပါတယ် - " + r, Toast.LENGTH_LONG).show()
+                } catch (e: Exception) {
+                    Toast.makeText(this@SettingsActivity, "မမှန်ပါ: " + (e.message ?: ""), Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+        val noteCT = TextView(this)
+        noteCT.text = "Transcript mode က video ထဲမှာ ပြောတဲ့ စကားသား (caption) ကိုပဲ ဖတ်နိုင်ပါတယ်။ File mode မှာ အလုပ်မလုပ်ပါ။ အသံ (TTS) က Gemini API key နဲ့ ဆက်ထုတ်ပါတယ်။"
+        noteCT.setTextColor(Color.parseColor("#8A93B2"))
+        noteCT.textSize = 11f
+        noteCT.setPadding(0, dp(8), 0, 0)
+        ct.addView(noteCT)
+        root.addView(ct)
 
         val c4 = card()
         c4.addView(sectionTitle("RECAP အချိန် - DEFAULT"))

@@ -25,6 +25,11 @@ object Prefs {
     const val KEY_SPEED = "recap_speed"
     const val KEY_VERTICAL = "recap_vertical"
     const val KEY_CUSTOM_STYLE = "custom_style"
+    const val KEY_EXT_BASE = "ext_base"
+    const val KEY_EXT_KEY = "ext_key"
+    const val KEY_EXT_MODEL = "ext_model"
+    const val KEY_TRANSCRIPT_MODE = "transcript_mode"
+    const val KEY_TRANSCRIPT_FALLBACK = "transcript_fallback"
 
     private val validModels = setOf("gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.8-flash-lite")
     private val validVoices = setOf("Sulafat", "Vindemiatrix", "Erinome", "Aoede", "Kore", "Leda", "Zephyr", "Despina", "Charon", "Iapetus", "Achird", "Orus", "Puck", "Fenrir", "Algenib", "Rasalgethi")
@@ -100,6 +105,12 @@ object Prefs {
     }
 
     fun customStyle(ctx: Context): String = str(ctx, KEY_CUSTOM_STYLE, "")
+
+    fun extBase(ctx: Context): String = str(ctx, KEY_EXT_BASE, "https://openrouter.ai/api/v1")
+    fun extKey(ctx: Context): String = str(ctx, KEY_EXT_KEY, "")
+    fun extModel(ctx: Context): String = str(ctx, KEY_EXT_MODEL, "")
+    fun transcriptMode(ctx: Context): Boolean = bool(ctx, KEY_TRANSCRIPT_MODE, false)
+    fun transcriptFallback(ctx: Context): Boolean = bool(ctx, KEY_TRANSCRIPT_FALLBACK, true)
 
     fun vertical(ctx: Context): Boolean = str(ctx, KEY_VERTICAL, "0") == "1"
     fun captions(ctx: Context): Boolean = bool(ctx, KEY_CAPTIONS, true)

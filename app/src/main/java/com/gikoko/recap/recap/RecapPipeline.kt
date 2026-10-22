@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableList
 import com.gikoko.recap.net.GeminiClient
 import com.gikoko.recap.net.RecapPlan
 import com.gikoko.recap.net.Segment
+import com.gikoko.recap.net.TranscriptClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -47,7 +48,12 @@ data class RecapConfig(
     val style: String,
     val speed: Double,
     val customStyle: String,
-    val vertical: Boolean
+    val vertical: Boolean,
+    val extBase: String = "",
+    val extKey: String = "",
+    val extModel: String = "",
+    val transcriptMode: Boolean = false,
+    val transcriptFallback: Boolean = true
 )
 
 data class RecapOutput(val video: File, val srt: File, val title: String, val summary: String)
@@ -187,10 +193,20 @@ object RecapPipeline {
             onStep("Gemini နဲ့ Video ခြုံငုံနေသည်...")
             onProgress(18)
             val plan: RecapPlan
-            if (cfg.provider == "custom") {
-                plan = GeminiClient.generatePlanCustom(cfg.baseUrl, cfg.customKey, cfg.customModel, url, false, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
+            if (cfg.transcriptMode && cfg.extKey.isNotEmpty()) {
+                plan = transcriptPlan(cfg, url, onLog)
+            } else if (cfg.provider == "custom") {
+                plan = try {
+                    GeminiClient.generatePlanCustom(cfg.baseUrl, cfg.customKey, cfg.customModel, url, false, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
+                } catch (e: Exception) {
+                    tryTranscriptFallback(e, cfg, url, onLog)
+                }
             } else {
-                plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, url, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
+                plan = try {
+                    GeminiClient.generatePlan(cfg.apiKey, cfg.model, url, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
+                } catch (e: Exception) {
+                    tryTranscriptFallback(e, cfg, url, onLog)
+                }
             }
             onProgress(45)
             onStep("အသံထုတ်နေသည်...")
@@ -245,6 +261,22 @@ object RecapPipeline {
         if (plan.chapters.isNotEmpty()) summary += "\n\nCHAPTERS\n" + plan.chapters.joinToString("\n")
         if (plan.quiz.isNotEmpty()) summary += "\n\nQUIZ\n" + plan.quiz.joinToString("\n")
         return RecapOutput(out, srt, plan.title, summary)
+    }
+
+    private fun tryTranscriptFallback(e: Exception, cfg: RecapConfig, url: String, onLog: (String) -> Unit): RecapPlan {
+        val m = (e.message ?: "").lowercase()
+        val quota = m.contains("429") || m.contains("resource_exhausted") || m.contains("quota") || m.contains("rate limit")
+        if (!quota || !cfg.transcriptFallback || cfg.extKey.isEmpty()) throw e
+        onLog("Quota hit - transcript fallback (" + cfg.extModel + ")")
+        return transcriptPlan(cfg, url, onLog)
+    }
+
+    private fun transcriptPlan(cfg: RecapConfig, url: String, onLog: (String) -> Unit): RecapPlan {
+        val vid = TranscriptClient.extractVideoId(url) ?: throw IOException("YouTube link မှ video ID မရနိုင်ပါ")
+        onLog("Fetching transcript: " + vid)
+        val t = TranscriptClient.fetchTranscript(vid, onLog)
+        onLog("Transcript ready: " + t.length + " chars - plan ဆွဲနေသည်")
+        return GeminiClient.generatePlanTranscript(cfg.extBase, cfg.extKey, cfg.extModel, t, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
     }
 
     private fun imageItem(f: File, durUs: Long): EditedMediaItem {
