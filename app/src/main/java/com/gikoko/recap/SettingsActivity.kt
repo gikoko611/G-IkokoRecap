@@ -419,7 +419,7 @@ class SettingsActivity : AppCompatActivity() {
             ch.setOnCheckedChangeListener { _, checked ->
                 if (checked) {
                     Prefs.save(this, Prefs.KEY_EXT_BASE, presetUrls[i])
-                    extModelInput.hint = "model name (ဥပမာ " + presetHints[i] + ")"
+                    if (::extModelInput.isInitialized) extModelInput.hint = "model name (ဥပမာ " + presetHints[i] + ")"
                 }
             }
             presetGroup.addView(ch)
@@ -560,8 +560,11 @@ class SettingsActivity : AppCompatActivity() {
             ch.id = 42300 + i
             ch.setOnCheckedChangeListener { _, checked ->
                 if (checked) {
-                    Prefs.save(this, Prefs.KEY_UI_LANG, if (i == 0) "mm" else "en")
-                    recreate()
+                    val v = if (i == 0) "mm" else "en"
+                    if (Prefs.uiLang(this) != v) {
+                        Prefs.save(this, Prefs.KEY_UI_LANG, v)
+                        recreate()
+                    }
                 }
             }
             uiG.addView(ch)
