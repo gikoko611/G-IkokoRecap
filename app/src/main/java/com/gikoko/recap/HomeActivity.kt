@@ -38,6 +38,8 @@ class HomeActivity : AppCompatActivity() {
     private val voices = listOf("Sulafat", "Vindemiatrix", "Erinome", "Aoede", "Kore", "Leda", "Zephyr", "Despina", "Charon", "Iapetus", "Achird", "Orus", "Puck", "Fenrir", "Algenib", "Rasalgethi")
     private val lengths = listOf("Auto", "1 min", "3 min", "5 min")
     private val minutesOf = intArrayOf(0, 1, 3, 5)
+    private val styles = listOf("summary", "talk", "tech", "story", "highlights", "news", "funny", "eli5", "lesson", "trailer")
+    private val styleLabels = listOf("ခြုံငုံသုံးသပ်", "စကားပြောပုံစံ", "နည်းပညာရှင်းပြ", "ဇာတ်လမ်းသုံးသပ်", "အဓိကအချက်", "သတင်းပုံစံ", "ဟာသပေါင်းပြော", "ရိုးရှင်းလင်းလင်း", "သင်ခန်းစာ", "Trailer ပုံစံ")
 
     private var mode = "youtube"
     private var pickedFile: File? = null
@@ -405,6 +407,31 @@ class HomeActivity : AppCompatActivity() {
         sg.check(if (segsFull) 3101 else 3100)
         c3.addView(sg)
         root.addView(c3)
+
+        val cStyle = card()
+        cStyle.addView(sectionTitle("RECAP • ပုံစံ - STYLE"))
+        val styleGroup = ChipGroup(this)
+        styleGroup.isSingleSelection = true
+        styleGroup.isSelectionRequired = true
+        styleLabels.forEachIndexed { i, s ->
+            val ch = chipOf(s)
+            ch.id = 5000 + i
+            ch.setOnCheckedChangeListener { _, checked ->
+                if (checked) Prefs.save(this, Prefs.KEY_STYLE, styles[i])
+            }
+            styleGroup.addView(ch)
+        }
+        val curStyle = Prefs.style(this)
+        val sti = styles.indexOf(curStyle)
+        styleGroup.check(if (sti >= 0) 5000 + sti else 5000)
+        cStyle.addView(styleGroup)
+        val styleNote = TextView(this)
+        styleNote.text = "Recap ကို ဘယ်ပုံစံနဲ့ ပြောပြမလဲ ရွေးချယ်ပါ"
+        styleNote.setTextColor(Color.parseColor("#8A93B2"))
+        styleNote.textSize = 11f
+        styleNote.setPadding(0, dp(8), 0, 0)
+        cStyle.addView(styleNote)
+        root.addView(cStyle)
 
         val c4 = card()
         c4.addView(sectionTitle("AI \u2022 အသံမျိုးစုံ"))
