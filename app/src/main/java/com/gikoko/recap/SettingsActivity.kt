@@ -585,6 +585,27 @@ class SettingsActivity : AppCompatActivity() {
         }
         root.addView(capp)
 
+        val cfp = card()
+        cfp.addView(sectionTitle("FEATURE PAGES - STUDIO"))
+        val rowF = LinearLayout(this)
+        rowF.orientation = LinearLayout.HORIZONTAL
+        val fp1 = flatBtn("RECAP STUDIO", R.drawable.bg_gold_btn, "#0A0A00")
+        val fp2 = flatBtn("VOICE LAB", R.drawable.bg_chip_selected, "#F2F5FF")
+        rowF.addView(fp1, btnParams())
+        rowF.addView(fp2, btnParams())
+        val fpP = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        fpP.topMargin = dp(8)
+        cfp.addView(rowF, fpP)
+        fp1.setOnClickListener { startActivity(Intent(this, StudioActivity::class.java)) }
+        fp2.setOnClickListener { startActivity(Intent(this, VoiceLabActivity::class.java)) }
+        val fpNote = TextView(this)
+        fpNote.text = "RECAP STUDIO မှာ Smart length, Auto shorts, Dialogue speaker-2, BGM mix, Podcast export တွေ ရှိတယ်။ VOICE LAB မှာ ကိုယ့်အသံ ဖမ်းပြီး AI နဲ့ မတ်ချာလို့ရတယ်။"
+        fpNote.setTextColor(Color.parseColor("#8A93B2"))
+        fpNote.textSize = 11f
+        fpNote.setPadding(0, dp(8), 0, 0)
+        cfp.addView(fpNote)
+        root.addView(cfp)
+
         val c4 = card()
         c4.addView(sectionTitle("RECAP အချိန် - DEFAULT"))
         val lg = ChipGroup(this)
@@ -687,7 +708,7 @@ class SettingsActivity : AppCompatActivity() {
         val c8 = card()
         c8.addView(sectionTitle("ABOUT"))
         val ab1 = TextView(this)
-        ab1.text = "GIkoko One Recap v0.0.1 (Pro)"
+        ab1.text = "GIKOKO RECAP v0.0.1 (Pro)"
         ab1.setTextColor(Color.parseColor("#FFC940"))
         ab1.textSize = 15f
         ab1.setTypeface(null, Typeface.BOLD)
