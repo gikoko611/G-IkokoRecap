@@ -197,7 +197,7 @@ class HomeActivity : AppCompatActivity() {
             drawer.closeDrawer(Gravity.START)
             AlertDialog.Builder(this)
                 .setTitle("GIkoko One Recap")
-                .setMessage("Version 2.1.1 (Pro)\n\nAI video recap - Myanmar voice + captions.\nGemini 3.8 Flash + Custom REST provider.\nDeveloped by I Ko Ko.")
+                .setMessage("Version 0.0.1 (Pro)\n\nAI video recap - Myanmar voice + captions.\nGemini 3.8 Flash + Custom REST provider.\nDeveloped by I Ko Ko.")
                 .setPositiveButton("OK", null)
                 .show()
         })
@@ -601,7 +601,7 @@ class HomeActivity : AppCompatActivity() {
         beat.start()
 
         val ver = TextView(this)
-        ver.text = "GIkoko One Recap v2.1.1 Pro \u2022 powered by Gemini 3.8"
+        ver.text = "GIkoko One Recap v0.0.1 Pro \u2022 powered by Gemini 3.8"
         ver.gravity = Gravity.CENTER
         ver.setTextColor(Color.parseColor("#5A6480"))
         ver.textSize = 11f
@@ -667,7 +667,7 @@ class HomeActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val (pcm, rate) = withContext(Dispatchers.IO) {
-                    GeminiClient.generateTts(key, "GIkoko One Recap မှ ကြိုဆိုပါတယ်။ ဒီက သင်ရွေးထားတဲ့ အသံပါ။", v, Prefs.speed(this))
+                    GeminiClient.generateTts(key, "GIkoko One Recap မှ ကြိုဆိုပါတယ်။ ဒီက သင်ရွေးထားတဲ့ အသံပါ။", v, Prefs.speed(this@HomeActivity))
                 }
                 val wav = WavUtil.pcmToWav(pcm, rate)
                 val f = File(cacheDir, "voice_preview.wav")

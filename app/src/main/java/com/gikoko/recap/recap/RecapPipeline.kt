@@ -143,7 +143,7 @@ object RecapPipeline {
             }
             if (cfg.vertical) {
                 videoEffects.add(androidx.media3.effect.Crop(cropL, cropR, cropT, cropB))
-                videoEffects.add(Presentation.createForWidth(1080))
+                videoEffects.add(Presentation.createForWidthAndHeight(1080, 1920, Presentation.LAYOUT_SCALE_TO_FIT))
             } else {
                 videoEffects.add(Presentation.createForHeight(if (cfg.quality == 0) 720 else 1080))
             }
