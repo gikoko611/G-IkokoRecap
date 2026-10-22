@@ -30,6 +30,7 @@ class ConfirmActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        DebugLog.log(this, "open confirm")
         val planPath = intent.getStringExtra("plan_path") ?: ""
         if (planPath.isEmpty() || !File(planPath).exists()) {
             finish()

@@ -46,6 +46,7 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        DebugLog.log(this, "open settings")
         setContentView(R.layout.activity_settings)
         val root = findViewById<LinearLayout>(R.id.rootContainer)
         build(root)
@@ -708,7 +709,7 @@ class SettingsActivity : AppCompatActivity() {
         val c8 = card()
         c8.addView(sectionTitle("ABOUT"))
         val ab1 = TextView(this)
-        ab1.text = "GIKOKO RECAP v0.0.1 (Pro)"
+        ab1.text = "GIKOKO RECAP v2.0 (Pro)"
         ab1.setTextColor(Color.parseColor("#FFC940"))
         ab1.textSize = 15f
         ab1.setTypeface(null, Typeface.BOLD)

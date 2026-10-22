@@ -65,6 +65,7 @@ class HomeActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_home)
+        DebugLog.log(this, "open home")
         drawer = findViewById(R.id.drawerLayout)
         val root = findViewById<LinearLayout>(R.id.rootContainer)
         val panel = findViewById<LinearLayout>(R.id.drawerPanel)
@@ -193,11 +194,27 @@ class HomeActivity : AppCompatActivity() {
             drawer.closeDrawer(Gravity.START)
             startActivity(Intent(this, HistoryActivity::class.java))
         })
+        panel.addView(menuItem("🐞  Crash Log") {
+            drawer.closeDrawer(Gravity.START)
+            val logTxt = DebugLog.read(this)
+            AlertDialog.Builder(this)
+                .setTitle("CRASH LOG")
+                .setMessage(if (logTxt.length > 3500) logTxt.take(3500) else logTxt)
+                .setPositiveButton("SHARE") { _, _ ->
+                    val send = Intent(Intent.ACTION_SEND)
+                    send.type = "text/plain"
+                    send.putExtra(Intent.EXTRA_TEXT, logTxt)
+                    startActivity(Intent.createChooser(send, "Crash Log"))
+                }
+                .setNegativeButton(L.s(this, "ဖျက်မည်", "Delete")) { _, _ -> DebugLog.clear(this) }
+                .setNeutralButton("OK", null)
+                .show()
+        })
         panel.addView(menuItem("ℹ️  About") {
             drawer.closeDrawer(Gravity.START)
             AlertDialog.Builder(this)
-                .setTitle("GIkoko One Recap")
-                .setMessage("Version 0.0.1 (Pro)\n\nAI video recap - Myanmar voice + captions.\nGemini 3.8 Flash + Custom REST provider.\nDeveloped by I Ko Ko.")
+                .setTitle("GIKOKO RECAP")
+                .setMessage("Version 2.0 (Pro)\n\nAI video recap - Myanmar voice + captions.\nGemini 3.8 Flash + Custom REST provider.\nDeveloped by I Ko Ko.")
                 .setPositiveButton("OK", null)
                 .show()
         })
