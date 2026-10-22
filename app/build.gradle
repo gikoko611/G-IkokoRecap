@@ -11,7 +11,7 @@ android {
         applicationId 'com.gikoko.onerecap'
         minSdk 24
         targetSdk 34
-        versionCode 14
+        versionCode 15
         versionName '2.0'
     }
 
@@ -63,3 +63,4 @@ dependencies {
     implementation 'androidx.media3:media3-exoplayer:1.4.1'
     implementation 'androidx.media3:media3-ui:1.4.1'
 }
+

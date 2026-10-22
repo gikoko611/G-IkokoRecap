@@ -293,6 +293,10 @@ class ToolsActivity : AppCompatActivity() {
         addGridBox(g3, gridBox("💬", "SRT EXPORT") { startActivity(Intent(this, SrtActivity::class.java)) })
         root.addView(g3)
 
+        val g4 = gridRow()
+        addGridBox(g4, gridBox("🖼", "THUMB MAKER") { startActivity(Intent(this, ThumbActivity::class.java)) })
+        root.addView(g4)
+
         val ce = card()
         ce.addView(sectionTitle("TTS ENGINE - အသံထုတ် ယန္တရား"))
         val engG = ChipGroup(this)
@@ -778,4 +782,5 @@ class ToolsActivity : AppCompatActivity() {
         super.onDestroy()
     }
 }
+
 
