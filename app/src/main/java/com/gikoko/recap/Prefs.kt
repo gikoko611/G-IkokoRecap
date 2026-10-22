@@ -22,6 +22,9 @@ object Prefs {
     const val KEY_CUSTOM_KEY = "custom_key"
     const val KEY_CUSTOM_MODEL = "custom_model"
 
+    private val validModels = setOf("gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.8-flash-lite")
+    private val validVoices = setOf("Sulafat", "Vindemiatrix", "Erinome", "Aoede", "Kore", "Leda", "Zephyr", "Despina", "Charon", "Iapetus", "Achird", "Orus", "Puck", "Fenrir", "Algenib", "Rasalgethi")
+
     private fun sp(ctx: Context) = ctx.getSharedPreferences(NAME, Context.MODE_PRIVATE)
 
     fun save(ctx: Context, key: String, value: String) {
@@ -53,9 +56,26 @@ object Prefs {
     fun provider(ctx: Context): String = str(ctx, KEY_PROVIDER, "gemini")
     fun baseUrl(ctx: Context): String = str(ctx, KEY_BASE_URL, "https://openrouter.ai/api/v1")
     fun customKey(ctx: Context): String = str(ctx, KEY_CUSTOM_KEY, "")
+
+    fun model(ctx: Context): String {
+        val m = str(ctx, KEY_MODEL, "gemini-3.8-flash")
+        if (m in validModels) return m
+        save(ctx, KEY_MODEL, "gemini-3.8-flash")
+        return "gemini-3.8-flash"
+    }
+
+    fun voice(ctx: Context): String {
+        val v = str(ctx, KEY_VOICE, "Sulafat")
+        val fixed = if (v == "Sulafet") "Sulafat" else v
+        if (fixed in validVoices) {
+            if (fixed != v) save(ctx, KEY_VOICE, fixed)
+            return fixed
+        }
+        save(ctx, KEY_VOICE, "Sulafat")
+        return "Sulafat"
+    }
+
     fun customModel(ctx: Context): String = str(ctx, KEY_CUSTOM_MODEL, "")
-    fun model(ctx: Context): String = str(ctx, KEY_MODEL, "gemini-3.8-flash")
-    fun voice(ctx: Context): String = str(ctx, KEY_VOICE, "Sulafat")
     fun minutes(ctx: Context): Int = int(ctx, KEY_MINUTES, 0)
     fun captions(ctx: Context): Boolean = bool(ctx, KEY_CAPTIONS, true)
     fun lang(ctx: Context): String = str(ctx, KEY_LANG, "my")

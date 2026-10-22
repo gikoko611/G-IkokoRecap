@@ -133,6 +133,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun updateProviderVis() {
+        if (!::customCard.isInitialized) return
         val gemini = Prefs.provider(this) != "custom"
         for (c in geminiModelCards) c.visibility = if (gemini) View.VISIBLE else View.GONE
         customCard.visibility = if (gemini) View.GONE else View.VISIBLE
@@ -496,7 +497,7 @@ class SettingsActivity : AppCompatActivity() {
         val c8 = card()
         c8.addView(sectionTitle("ABOUT"))
         val ab1 = TextView(this)
-        ab1.text = "GIkoko One Recap v2.1 (Pro)"
+        ab1.text = "GIkoko One Recap v2.1.1 (Pro)"
         ab1.setTextColor(Color.parseColor("#FFC940"))
         ab1.textSize = 15f
         ab1.setTypeface(null, Typeface.BOLD)
