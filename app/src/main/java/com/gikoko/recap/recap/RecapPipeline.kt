@@ -55,7 +55,8 @@ object RecapPipeline {
         srcFile: File,
         cfg: RecapConfig,
         onStep: (String) -> Unit,
-        onLog: (String) -> Unit
+        onLog: (String) -> Unit,
+        onProgress: (Int) -> Unit
     ): RecapOutput {
         val cache = File(context.cacheDir, "recap_work")
         cache.mkdirs()
@@ -63,28 +64,37 @@ object RecapPipeline {
             val plan: RecapPlan
             if (cfg.provider == "custom") {
                 onStep("Custom provider နဲ့ ခြုံငုံနေသည်...")
+                onProgress(3)
                 val mb = srcFile.length() / (1024.0 * 1024.0)
                 if (mb > 24) throw IOException("Custom provider နဲ့ Video File mode မှာ 24MB အောက်ပဲရတယ်။ YouTube mode ကို သုံးပါ။")
                 onLog("Encoding file " + String.format("%.1f", mb) + " MB")
+                onProgress(18)
                 val b64 = android.util.Base64.encodeToString(srcFile.readBytes(), android.util.Base64.NO_WRAP)
                 plan = GeminiClient.generatePlanCustom(cfg.baseUrl, cfg.customKey, cfg.customModel, "data:video/mp4;base64," + b64, true, cfg.targetMinutes, cfg.lang, cfg.fullSegments, onLog)
+                onProgress(45)
             } else {
                 onStep("Video ကို Gemini ဆီ တင်နေသည်...")
+                onProgress(3)
                 val mime = GeminiClient.guessMime(srcFile.name)
                 val fileName = GeminiClient.uploadVideo(cfg.apiKey, srcFile, mime, srcFile.name)
                 onLog("Upload: " + fileName)
+                onProgress(8)
                 val ready = GeminiClient.waitForFileReady(cfg.apiKey, fileName, onLog)
+                onProgress(12)
                 onStep("AI နဲ့ ခြုံငုံသုံးသပ်နေသည်...")
+                onProgress(18)
                 plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, ready, cfg.targetMinutes, cfg.lang, cfg.fullSegments, onLog)
+                onProgress(45)
             }
             onStep("အသံထုတ်နေသည်...")
-            val w = genWavs(cache, cfg, plan.segments, onLog)
+            val w = genWavs(cache, cfg, plan.segments, onLog, onProgress, 45, 20)
             Pair(plan, w)
         }
         val plan = prep.first
         val wavs = prep.second
 
         onStep("Recap video ဖွဲ့စည်းနေသည်...")
+        onProgress(68)
         val videoItems = ArrayList<EditedMediaItem>()
         for (i in plan.segments.indices) {
             val seg = plan.segments[i]
@@ -118,6 +128,7 @@ object RecapPipeline {
         withContext(Dispatchers.Main) {
             compose(context, videoItems, audioItems, out)
         }
+        onProgress(96)
         val srt = File(cache, "recap.srt")
         withContext(Dispatchers.IO) {
             srt.writeText(buildSrt(plan.segments, wavs, 0))
@@ -131,36 +142,43 @@ object RecapPipeline {
         url: String,
         cfg: RecapConfig,
         onStep: (String) -> Unit,
-        onLog: (String) -> Unit
+        onLog: (String) -> Unit,
+        onProgress: (Int) -> Unit
     ): RecapOutput {
         val cache = File(context.cacheDir, "recap_work")
         cache.mkdirs()
         val prep = withContext(Dispatchers.IO) {
             onStep("Gemini နဲ့ Video ခြုံငုံနေသည်...")
+            onProgress(18)
             val plan: RecapPlan
             if (cfg.provider == "custom") {
                 plan = GeminiClient.generatePlanCustom(cfg.baseUrl, cfg.customKey, cfg.customModel, url, false, cfg.targetMinutes, cfg.lang, cfg.fullSegments, onLog)
             } else {
                 plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, url, cfg.targetMinutes, cfg.lang, cfg.fullSegments, onLog)
             }
+            onProgress(45)
             onStep("အသံထုတ်နေသည်...")
-            val w = genWavs(cache, cfg, plan.segments, onLog)
+            val w = genWavs(cache, cfg, plan.segments, onLog, onProgress, 45, 20)
             Pair(plan, w)
         }
         val plan = prep.first
         val wavs = prep.second
 
         onStep("ပုံဖရင်များ ဆွဲနေသည်...")
+        val nSeg = plan.segments.size
         withContext(Dispatchers.IO) {
             for (i in plan.segments.indices) {
                 val f = File(cache, "frame_" + i + ".jpg")
                 FrameRenderer.render(plan.title, plan.segments[i].text, i, f, cfg.watermark)
+                onProgress(66 + 6 * (i + 1) / nSeg)
             }
             if (cfg.introOutro) {
                 FrameRenderer.renderBranded(File(cache, "intro.jpg"), true, cfg.watermark)
                 FrameRenderer.renderBranded(File(cache, "outro.jpg"), false, cfg.watermark)
             }
         }
+        onStep("Recap video ဖွဲ့စည်းနေသည်...")
+        onProgress(74)
         val videoItems = ArrayList<EditedMediaItem>()
         if (cfg.introOutro) {
             videoItems.add(imageItem(File(cache, "intro.jpg"), 2500000L))
@@ -182,6 +200,7 @@ object RecapPipeline {
         withContext(Dispatchers.Main) {
             compose(context, videoItems, audioItems, out)
         }
+        onProgress(96)
         val srt = File(cache, "recap.srt")
         withContext(Dispatchers.IO) {
             srt.writeText(buildSrt(plan.segments, wavs, if (cfg.introOutro) 2500 else 0))
@@ -202,7 +221,10 @@ object RecapPipeline {
         cache: File,
         cfg: RecapConfig,
         segs: List<Segment>,
-        onLog: (String) -> Unit
+        onLog: (String) -> Unit,
+        onProgress: (Int) -> Unit,
+        base: Int,
+        span: Int
     ): ArrayList<File> = withContext(Dispatchers.IO) {
         val list = ArrayList<File>()
         for (i in segs.indices) {
@@ -212,6 +234,7 @@ object RecapPipeline {
             val f = File(cache, "seg_" + i + ".wav")
             f.writeBytes(wav)
             list.add(f)
+            onProgress(base + span * (i + 1) / segs.size)
         }
         list
     }
