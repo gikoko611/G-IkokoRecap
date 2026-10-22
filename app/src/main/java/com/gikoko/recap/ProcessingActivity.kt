@@ -210,7 +210,7 @@ class ProcessingActivity : AppCompatActivity() {
                         )
                     }
                 }
-                stepText.text = L.s(this, "Recap သိမ်းနေသည်...", "Saving recap...")
+                stepText.text = L.s(this@ProcessingActivity, "Recap သိမ်းနေသည်...", "Saving recap...")
                 setProg(98)
                 addLog("Recap video ready ✓")
                 val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
@@ -262,19 +262,19 @@ class ProcessingActivity : AppCompatActivity() {
                 val msg = e.message ?: e.toString()
                 runOnUiThread {
                     addLog("ERROR: " + msg)
-                    stepText.text = L.s(this, "မအောင်မြင်ပါ", "Failed")
+                    stepText.text = L.s(this@ProcessingActivity, "မအောင်မြင်ပါ", "Failed")
                     AlertDialog.Builder(this@ProcessingActivity)
-                        .setTitle(L.s(this, "Recap မအောင်မြင်ပါ", "Recap failed"))
+                        .setTitle(L.s(this@ProcessingActivity, "Recap မအောင်မြင်ပါ", "Recap failed"))
                         .setMessage(msg)
-                        .setPositiveButton(L.s(this, "ပြန်သွားမည်", "Go back")) { d, _ -> finish() }
-                        .setNeutralButton(L.s(this, "ထပ်စမ်းမည်", "Retry")) { d, _ ->
+                        .setPositiveButton(L.s(this@ProcessingActivity, "ပြန်သွားမည်", "Go back")) { d, _ -> finish() }
+                        .setNeutralButton(L.s(this@ProcessingActivity, "ထပ်စမ်းမည်", "Retry")) { d, _ ->
                             busy = false
                             lastProg = 0
                             bar.setProgress(0)
                             addLog("--- retry ---")
                             runPipeline()
                         }
-                        .setNegativeButton(L.s(this, "အသေးစိတ်ကြည့်မည်", "See details")) { d, _ -> d.dismiss() }
+                        .setNegativeButton(L.s(this@ProcessingActivity, "အသေးစိတ်ကြည့်မည်", "See details")) { d, _ -> d.dismiss() }
                         .show()
                 }
             }
@@ -306,7 +306,7 @@ class ProcessingActivity : AppCompatActivity() {
         bp.setMargins(dp(28), dp(18), dp(28), 0)
         root.addView(bar, bp)
 
-        stepText.text = L.s(this, "စတင်နေသည်...", "Starting...")
+        stepText.text = L.s(this@ProcessingActivity, "စတင်နေသည်...", "Starting...")
         stepText.setTextColor(Color.parseColor("#3DE8F8"))
         stepText.textSize = 14f
         stepText.gravity = Gravity.CENTER

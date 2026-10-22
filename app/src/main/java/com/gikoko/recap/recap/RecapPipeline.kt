@@ -442,16 +442,18 @@ object RecapPipeline {
                 }
             }
             transformer.addListener(object : Transformer.Listener {
-                override fun onCompleted(inputMediaItem: MediaItem, exportResult: ExportResult) {
+                override fun onCompleted(composition: Composition, exportResult: ExportResult) {
                     extractDone?.invoke(null)
                 }
 
-                override fun onError(inputMediaItem: MediaItem, exportResult: ExportResult, exportException: ExportException) {
+                override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) {
                     extractDone?.invoke(exportException)
                 }
             })
             val item = EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(src))).setRemoveVideo(true).build()
-            transformer.start(item, out.absolutePath)
+            val seq = EditedMediaItemSequence(ImmutableList.of(item))
+            val composition = Composition.Builder(seq).build()
+            transformer.start(composition, out.absolutePath)
             cont.invokeOnCancellation {
                 runCatching { transformer.cancel() }
             }

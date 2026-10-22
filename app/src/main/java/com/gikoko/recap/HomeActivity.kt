@@ -78,7 +78,7 @@ class HomeActivity : AppCompatActivity() {
         if (!shared.isNullOrBlank() && (shared.contains("youtube.com") || shared.contains("youtu.be"))) {
             linkInput.setText(shared.trim())
             setMode("youtube")
-            Toast.makeText(this, L.s(this, "YouTube link ရပါပြီ - START နှိပ်ပါ", "YouTube link ready - press START"), Toast.LENGTH_LONG).show()
+            Toast.makeText(this, L.s(this@HomeActivity, "YouTube link ရပါပြီ - START နှိပ်ပါ", "YouTube link ready - press START"), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -261,7 +261,7 @@ class HomeActivity : AppCompatActivity() {
         if (txt.isEmpty()) return
         val show = if (txt.length > 2500) txt.substring(0, 2500) else txt
         AlertDialog.Builder(this)
-            .setTitle(L.s(this, "ယခင် Crash Report", "Crash Report"))
+            .setTitle(L.s(this@HomeActivity, "ယခင် Crash Report", "Crash Report"))
             .setMessage(show)
             .setPositiveButton("SHARE") { _, _ ->
                 val send = Intent(Intent.ACTION_SEND)
@@ -269,7 +269,7 @@ class HomeActivity : AppCompatActivity() {
                 send.putExtra(Intent.EXTRA_TEXT, txt)
                 startActivity(Intent.createChooser(send, "Crash Report"))
             }
-            .setNegativeButton(L.s(this, "ဖျက်မည်", "Delete")) { _, _ ->
+            .setNegativeButton(L.s(this@HomeActivity, "ဖျက်မည်", "Delete")) { _, _ ->
                 f.delete()
             }
             .show()
@@ -281,7 +281,7 @@ class HomeActivity : AppCompatActivity() {
         val provider = Prefs.provider(this)
         if (key.isEmpty()) {
             val warn = TextView(this)
-            warn.text = L.s(this, "Gemini API key မထည့်ရသေးပါ", "Gemini API key not set yet")
+            warn.text = L.s(this@HomeActivity, "Gemini API key မထည့်ရသေးပါ", "Gemini API key not set yet")
             warn.setTextColor(Color.parseColor("#FFC940"))
             warn.textSize = 15f
             warn.setTypeface(null, Typeface.BOLD)
@@ -396,7 +396,7 @@ class HomeActivity : AppCompatActivity() {
         fileBox = LinearLayout(this)
         fileBox.orientation = LinearLayout.VERTICAL
         val pickBtn = Button(this)
-        pickBtn.text = L.s(this, "ဖုန်းထဲက Video ရွေးမယ်", "Pick video from phone")
+        pickBtn.text = L.s(this@HomeActivity, "ဖုန်းထဲက Video ရွေးမယ်", "Pick video from phone")
         pickBtn.isAllCaps = false
         pickBtn.textSize = 13f
         pickBtn.setTextColor(Color.parseColor("#0A0A00"))
@@ -408,7 +408,7 @@ class HomeActivity : AppCompatActivity() {
         }
         fileBox.addView(pickBtn)
         fileLabel = TextView(this)
-        fileLabel.text = L.s(this, "Video မရွေးရသေးပါ", "No video selected yet")
+        fileLabel.text = L.s(this@HomeActivity, "Video မရွေးရသေးပါ", "No video selected yet")
         fileLabel.setTextColor(Color.parseColor("#8A93B2"))
         fileLabel.textSize = 12f
         fileLabel.setPadding(dp(4), dp(8), dp(4), 0)
@@ -491,14 +491,14 @@ class HomeActivity : AppCompatActivity() {
         styleGroup.check(if (sti >= 0) 5000 + sti else 5000)
         cStyle.addView(styleGroup)
         val styleNote = TextView(this)
-        styleNote.text = L.s(this, "Recap ကို ဘယ်ပုံစံနဲ့ ပြောပြမလဲ ရွေးချယ်ပါ", "Choose how your recap narrates")
+        styleNote.text = L.s(this@HomeActivity, "Recap ကို ဘယ်ပုံစံနဲ့ ပြောပြမလဲ ရွေးချယ်ပါ", "Choose how your recap narrates")
         styleNote.setTextColor(Color.parseColor("#8A93B2"))
         styleNote.textSize = 11f
         styleNote.setPadding(0, dp(8), 0, 0)
         cStyle.addView(styleNote)
 
         val customStyleInput = EditText(this)
-        customStyleInput.hint = L.s(this, "ကိုယ်ပိုင် style ညွှန်ကြားချက် (optional)", "Custom style instructions (optional)")
+        customStyleInput.hint = L.s(this@HomeActivity, "ကိုယ်ပိုင် style ညွှန်ကြားချက် (optional)", "Custom style instructions (optional)")
         inputStyle(customStyleInput)
         customStyleInput.setText(Prefs.customStyle(this))
         val csiP = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
@@ -522,7 +522,7 @@ class HomeActivity : AppCompatActivity() {
         c4.addView(voiceGroup)
 
         val noteV = TextView(this)
-        noteV.text = L.s(this, "Sulafat က မြန်မာအသံနဲ့ အနီးစပ်ဆုံး - default ပါ", "Sulafat is closest to a Myanmar voice - default")
+        noteV.text = L.s(this@HomeActivity, "Sulafat က မြန်မာအသံနဲ့ အနီးစပ်ဆုံး - default ပါ", "Sulafat is closest to a Myanmar voice - default")
         noteV.setTextColor(Color.parseColor("#8A93B2"))
         noteV.textSize = 11f
         noteV.setPadding(0, dp(6), 0, 0)
@@ -563,7 +563,7 @@ class HomeActivity : AppCompatActivity() {
         val c5 = card()
         c5.addView(sectionTitle("CAPTIONS"))
         val sw = SwitchCompat(this)
-        sw.text = L.s(this, "မြန်မာစာတန်းထိုး ထည့်မယ်", "Myanmar captions on")
+        sw.text = L.s(this@HomeActivity, "မြန်မာစာတန်းထိုး ထည့်မယ်", "Myanmar captions on")
         sw.textSize = 14f
         sw.setTextColor(Color.parseColor("#F2F5FF"))
         captionsOn = Prefs.captions(this)
@@ -612,13 +612,13 @@ class HomeActivity : AppCompatActivity() {
         start.setOnClickListener {
             val key = Prefs.apiKey(this)
             if (key.isEmpty()) {
-                Toast.makeText(this, L.s(this, "အသံ (TTS) အတွက် Gemini API key လိုပါတယ် - Settings မှာ ထည့်ပါ", "Gemini API key needed for voice (TTS) - add it in Settings"), Toast.LENGTH_LONG).show()
+                Toast.makeText(this, L.s(this@HomeActivity, "အသံ (TTS) အတွက် Gemini API key လိုပါတယ် - Settings မှာ ထည့်ပါ", "Gemini API key needed for voice (TTS) - add it in Settings"), Toast.LENGTH_LONG).show()
                 startActivity(Intent(this, SettingsActivity::class.java))
                 return@setOnClickListener
             }
             if (Prefs.provider(this) == "custom") {
                 if (Prefs.baseUrl(this).isEmpty() || Prefs.customKey(this).isEmpty() || Prefs.customModel(this).isEmpty()) {
-                    Toast.makeText(this, L.s(this, "Settings မှာ Custom provider (Base URL / Key / Free model) ဖြည့်ပါ", "Fill in Custom provider (Base URL / Key / Free model) in Settings"), Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, L.s(this@HomeActivity, "Settings မှာ Custom provider (Base URL / Key / Free model) ဖြည့်ပါ", "Fill in Custom provider (Base URL / Key / Free model) in Settings"), Toast.LENGTH_LONG).show()
                     startActivity(Intent(this, SettingsActivity::class.java))
                     return@setOnClickListener
                 }
@@ -634,11 +634,11 @@ class HomeActivity : AppCompatActivity() {
             if (mode == "youtube") {
                 val url = linkInput.text.toString().trim()
                 if (url.isEmpty()) {
-                    Toast.makeText(this, L.s(this, "YouTube link ထည့်ပေးပါ", "Please enter a YouTube link"), Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, L.s(this@HomeActivity, "YouTube link ထည့်ပေးပါ", "Please enter a YouTube link"), Toast.LENGTH_LONG).show()
                     return@setOnClickListener
                 }
                 if (!GeminiClient.isYouTubeLink(url)) {
-                    Toast.makeText(this, L.s(this, "Facebook/TikTok ဆိုရင် Video File နှိပ်ပြီး upload လုပ်ပါ", "For Facebook/TikTok use the Video File button"), Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, L.s(this@HomeActivity, "Facebook/TikTok ဆိုရင် Video File နှိပ်ပြီး upload လုပ်ပါ", "For Facebook/TikTok use the Video File button"), Toast.LENGTH_LONG).show()
                     return@setOnClickListener
                 }
                 i.putExtra("source", "youtube")
@@ -646,7 +646,7 @@ class HomeActivity : AppCompatActivity() {
             } else {
                 val f = pickedFile
                 if (f == null || !f.exists()) {
-                    Toast.makeText(this, L.s(this, "Video file ရွေးပေးပါ", "Please pick a video file"), Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, L.s(this@HomeActivity, "Video file ရွေးပေးပါ", "Please pick a video file"), Toast.LENGTH_LONG).show()
                     return@setOnClickListener
                 }
                 i.putExtra("source", "file")
@@ -659,11 +659,11 @@ class HomeActivity : AppCompatActivity() {
     private fun previewVoice() {
         val key = Prefs.apiKey(this)
         if (key.isEmpty()) {
-            Toast.makeText(this, L.s(this, "Settings မှာ Gemini API key ထည့်ပေးပါ", "Add your Gemini API key in Settings"), Toast.LENGTH_LONG).show()
+            Toast.makeText(this, L.s(this@HomeActivity, "Settings မှာ Gemini API key ထည့်ပေးပါ", "Add your Gemini API key in Settings"), Toast.LENGTH_LONG).show()
             return
         }
         val v = selectedVoice()
-        Toast.makeText(this, L.s(this, "အသံထုတ်နေသည်...", "Generating voice..."), Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, L.s(this@HomeActivity, "အသံထုတ်နေသည်...", "Generating voice..."), Toast.LENGTH_SHORT).show()
         lifecycleScope.launch {
             try {
                 val (pcm, rate) = withContext(Dispatchers.IO) {
@@ -749,7 +749,7 @@ class HomeActivity : AppCompatActivity() {
     private fun onVideoPicked(uri: Uri) {
         lifecycleScope.launch {
             try {
-                fileLabel.text = L.s(this, "ကူးယူနေသည်...", "Copying...")
+                fileLabel.text = L.s(this@HomeActivity, "ကူးယူနေသည်...", "Copying...")
                 val disp = queryName(uri)
                 val ext = if (disp.lastIndexOf('.') > 0) disp.substring(disp.lastIndexOf('.')) else ".mp4"
                 val dst = File(cacheDir, "picked_video" + ext)
@@ -760,13 +760,13 @@ class HomeActivity : AppCompatActivity() {
                         dst.outputStream().use { ins.copyTo(it) }
                     }
                 }
-                if (dst.length() == 0L) throw IllegalStateException(L.s(this, "ဖိုင်ဗလာဖြစ်နေသည်", "File is empty"))
+                if (dst.length() == 0L) throw IllegalStateException(L.s(this@HomeActivity, "ဖိုင်ဗလာဖြစ်နေသည်", "File is empty"))
                 pickedFile = dst
                 val mb = dst.length() / (1024.0 * 1024.0)
                 fileLabel.text = "ရွေးထားသည်: " + disp + " (" + String.format("%.1f", mb) + " MB)"
             } catch (e: Exception) {
                 pickedFile = null
-                fileLabel.text = L.s(this, "ကူးယူမအောင်မြင်: ", "Copy failed: ") + (e.message ?: "")
+                fileLabel.text = L.s(this@HomeActivity, "ကူးယူမအောင်မြင်: ", "Copy failed: ") + (e.message ?: "")
             }
         }
     }
