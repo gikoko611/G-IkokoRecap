@@ -451,11 +451,13 @@ object RecapPipeline {
     ) {
         val videoSeq = EditedMediaItemSequence(ImmutableList.copyOf(videoItems))
         val audioSeq = EditedMediaItemSequence(ImmutableList.copyOf(audioItems))
-        val builder = Composition.Builder(videoSeq, audioSeq)
+        val seqs = ArrayList<EditedMediaItemSequence>()
+        seqs.add(videoSeq)
+        seqs.add(audioSeq)
         if (bgmItems != null && bgmItems.isNotEmpty()) {
-            builder.addSequence(EditedMediaItemSequence(ImmutableList.copyOf(bgmItems)))
+            seqs.add(EditedMediaItemSequence(ImmutableList.copyOf(bgmItems)))
         }
-        val composition = builder.build()
+        val composition = Composition.Builder(seqs).build()
         val transformer = Transformer.Builder(context)
             .setVideoMimeType(MimeTypes.VIDEO_H264)
             .setAudioMimeType(MimeTypes.AUDIO_AAC)
@@ -536,10 +538,18 @@ object RecapPipeline {
         val vol = cfg.bgmVol.toFloat()
         var covered = 0L
         while (covered < totalMs && list.size < 40) {
-            val sonic = androidx.media3.common.audio.SonicAudioProcessor()
-            sonic.setVolume(vol)
+            val mix = androidx.media3.common.audio.ChannelMixingAudioProcessor()
+            mix.putChannelMixingMatrix(androidx.media3.common.audio.ChannelMixingMatrix(1, 1, floatArrayOf(vol)))
+            mix.putChannelMixingMatrix(androidx.media3.common.audio.ChannelMixingMatrix(2, 2, floatArrayOf(vol, 0f, 0f, vol)))
+            mix.putChannelMixingMatrix(androidx.media3.common.audio.ChannelMixingMatrix(6, 6, floatArrayOf(
+                vol, 0f, 0f, 0f, 0f, 0f,
+                0f, vol, 0f, 0f, 0f, 0f,
+                0f, 0f, vol, 0f, 0f, 0f,
+                0f, 0f, 0f, vol, 0f, 0f,
+                0f, 0f, 0f, 0f, vol, 0f,
+                0f, 0f, 0f, 0f, 0f, vol)))
             val mi = MediaItem.Builder().setUri(Uri.fromFile(f)).build()
-            val aps: List<androidx.media3.common.audio.AudioProcessor> = ImmutableList.of(sonic)
+            val aps: List<androidx.media3.common.audio.AudioProcessor> = ImmutableList.of(mix)
             list.add(EditedMediaItem.Builder(mi).setEffects(Effects(aps, ImmutableList.of())).build())
             covered += bgmMs
         }
