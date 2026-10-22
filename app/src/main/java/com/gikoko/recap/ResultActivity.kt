@@ -38,7 +38,7 @@ class ResultActivity : AppCompatActivity() {
         summaryText = intent.getStringExtra("summary") ?: ""
         val tPath = intent.getStringExtra("thumb") ?: ""
         if (vPath.isEmpty() || !File(vPath).exists()) {
-            Toast.makeText(this, "Video မတွေ့ပါ", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, L.s(this, "Video မတွေ့ပါ", "Video not found"), Toast.LENGTH_LONG).show()
             finish()
             return
         }
@@ -56,7 +56,7 @@ class ResultActivity : AppCompatActivity() {
         root.addView(head)
 
         val ok = TextView(this)
-        ok.text = "Recap အဆင့်သင့်ပါပြီ"
+        ok.text = L.s(this, "Recap အဆင့်သင့်ပါပြီ", "Your recap is ready")
         ok.setTextColor(Color.parseColor("#3DE8F8"))
         ok.textSize = 12f
         ok.gravity = Gravity.CENTER
@@ -89,9 +89,9 @@ class ResultActivity : AppCompatActivity() {
         rp.setMargins(dp(12), dp(12), dp(12), dp(4))
         root.addView(row, rp)
 
-        val save = btn("သိမ်းမည်", R.drawable.bg_gold_btn, "#0A0A00")
+        val save = btn(L.s(this, "သိမ်းမည်", "Save"), R.drawable.bg_gold_btn, "#0A0A00")
         val share = btn("Share Video", R.drawable.bg_chip_selected, "#F2F5FF")
-        val again = btn("အသစ်လုပ်မည်", R.drawable.bg_mode_card, "#C9D2EC")
+        val again = btn(L.s(this, "အသစ်လုပ်မည်", "New recap"), R.drawable.bg_mode_card, "#C9D2EC")
         row.addView(save, btnParams())
         row.addView(share, btnParams())
         row.addView(again, btnParams())
@@ -164,9 +164,9 @@ class ResultActivity : AppCompatActivity() {
         val okSrt = if (srt != null && srt.exists()) srt else null
         val ok = DownloadsUtil.saveRecap(this, videoFile, okSrt)
         if (ok) {
-            Toast.makeText(this, "Downloads ထဲမှာ သိမ်းပြီးပါပြီ", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, L.s(this, "Downloads ထဲမှာ သိမ်းပြီးပါပြီ", "Saved to Downloads"), Toast.LENGTH_LONG).show()
         } else {
-            Toast.makeText(this, "သိမ်းမအောင်မြင်ပါ", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, L.s(this, "သိမ်းမအောင်မြင်ပါ", "Save failed"), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -217,7 +217,7 @@ class ResultActivity : AppCompatActivity() {
             send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             startActivity(send)
         } catch (e: Exception) {
-            Toast.makeText(this, "App မတွေ့ပါ - share chooser ပွင့်မည်", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, L.s(this, "App မတွေ့ပါ - share chooser ပွင့်မည်", "App not found - share chooser will open"), Toast.LENGTH_SHORT).show()
             shareRecap()
         }
     }
@@ -230,7 +230,7 @@ class ResultActivity : AppCompatActivity() {
             send.type = "image/jpeg"
             send.putExtra(Intent.EXTRA_STREAM, uri)
             send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            startActivity(Intent.createChooser(send, "Thumbnail မျှဝေမည်"))
+            startActivity(Intent.createChooser(send, L.s(this, "Thumbnail မျှဝေမည်", "Share thumbnail")))
         } catch (e: Exception) {
             Toast.makeText(this, "Share failed: " + (e.message ?: ""), Toast.LENGTH_LONG).show()
         }

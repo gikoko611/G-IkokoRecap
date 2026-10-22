@@ -16,8 +16,10 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.gikoko.recap.net.GeminiClient
 import com.gikoko.recap.recap.DownloadsUtil
 import com.gikoko.recap.recap.RecapConfig
+import com.gikoko.recap.recap.RecapOutput
 import com.gikoko.recap.recap.RecapPipeline
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -116,34 +118,99 @@ class ProcessingActivity : AppCompatActivity() {
             Prefs.extKey(this),
             Prefs.extModel(this),
             Prefs.transcriptMode(this),
-            Prefs.transcriptFallback(this)
+            Prefs.transcriptFallback(this),
+            Prefs.wmSize(this),
+            Prefs.wmPos(this),
+            Prefs.wmLogo(this),
+            Prefs.theme(this),
+            Prefs.planConfirm(this)
         )
         val source = intent.getStringExtra("source") ?: "youtube"
         val url = intent.getStringExtra("url") ?: ""
         val path = intent.getStringExtra("path") ?: ""
+        val planPath = intent.getStringExtra("plan_path") ?: ""
         lifecycleScope.launch {
             try {
                 addLog("Engine start - provider: " + cfg.provider + ", model: " + if (cfg.provider == "custom") cfg.customModel else cfg.model)
-                val out = if (source == "file") {
-                    RecapPipeline.runFromFile(
-                        this@ProcessingActivity,
-                        File(path),
-                        cfg,
-                        { s -> runOnUiThread { stepText.text = s } },
-                        { s -> runOnUiThread { addLog(s) } },
-                        { p -> runOnUiThread { setProg(p) } }
-                    )
+                val out: RecapOutput
+                if (planPath.isNotEmpty() && File(planPath).exists()) {
+                    addLog("Confirmed plan loaded - rendering...")
+                    val loaded = GeminiClient.planFromJson(File(planPath).readText())
+                    out = if (source == "file") {
+                        RecapPipeline.renderFromFile(
+                            this@ProcessingActivity,
+                            File(path),
+                            loaded.first,
+                            cfg,
+                            loaded.second,
+                            { s -> runOnUiThread { stepText.text = s } },
+                            { s -> runOnUiThread { addLog(s) } },
+                            { p -> runOnUiThread { setProg(p) } }
+                        )
+                    } else {
+                        RecapPipeline.renderYouTube(
+                            this@ProcessingActivity,
+                            loaded.first,
+                            cfg,
+                            { s -> runOnUiThread { stepText.text = s } },
+                            { s -> runOnUiThread { addLog(s) } },
+                            { p -> runOnUiThread { setProg(p) } }
+                        )
+                    }
+                } else if (cfg.planConfirm) {
+                    val planFile = File(cacheDir, "plan_confirm.json")
+                    if (source == "file") {
+                        val pf = RecapPipeline.planFromFile(
+                            this@ProcessingActivity,
+                            File(path),
+                            cfg,
+                            { s -> runOnUiThread { stepText.text = s } },
+                            { s -> runOnUiThread { addLog(s) } },
+                            { p -> runOnUiThread { setProg(p) } }
+                        )
+                        planFile.writeText(GeminiClient.planToJson(pf.first, pf.second))
+                    } else {
+                        val p1 = RecapPipeline.planFromYouTube(
+                            this@ProcessingActivity,
+                            url,
+                            cfg,
+                            { s -> runOnUiThread { stepText.text = s } },
+                            { s -> runOnUiThread { addLog(s) } },
+                            { p -> runOnUiThread { setProg(p) } }
+                        )
+                        planFile.writeText(GeminiClient.planToJson(p1, true))
+                    }
+                    addLog("Plan ready - opening PLAN EDITOR...")
+                    val ci = Intent(this@ProcessingActivity, ConfirmActivity::class.java)
+                    ci.putExtra("plan_path", planFile.absolutePath)
+                    ci.putExtra("source", source)
+                    ci.putExtra("url", url)
+                    ci.putExtra("path", path)
+                    startActivity(ci)
+                    finish()
+                    return@launch
                 } else {
-                    RecapPipeline.runFromYouTube(
-                        this@ProcessingActivity,
-                        url,
-                        cfg,
-                        { s -> runOnUiThread { stepText.text = s } },
-                        { s -> runOnUiThread { addLog(s) } },
-                        { p -> runOnUiThread { setProg(p) } }
-                    )
+                    out = if (source == "file") {
+                        RecapPipeline.runFromFile(
+                            this@ProcessingActivity,
+                            File(path),
+                            cfg,
+                            { s -> runOnUiThread { stepText.text = s } },
+                            { s -> runOnUiThread { addLog(s) } },
+                            { p -> runOnUiThread { setProg(p) } }
+                        )
+                    } else {
+                        RecapPipeline.runFromYouTube(
+                            this@ProcessingActivity,
+                            url,
+                            cfg,
+                            { s -> runOnUiThread { stepText.text = s } },
+                            { s -> runOnUiThread { addLog(s) } },
+                            { p -> runOnUiThread { setProg(p) } }
+                        )
+                    }
                 }
-                stepText.text = "Recap သိမ်းနေသည်..."
+                stepText.text = L.s(this, "Recap သိမ်းနေသည်...", "Saving recap...")
                 setProg(98)
                 addLog("Recap video ready ✓")
                 val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
@@ -195,19 +262,19 @@ class ProcessingActivity : AppCompatActivity() {
                 val msg = e.message ?: e.toString()
                 runOnUiThread {
                     addLog("ERROR: " + msg)
-                    stepText.text = "မအောင်မြင်ပါ"
+                    stepText.text = L.s(this, "မအောင်မြင်ပါ", "Failed")
                     AlertDialog.Builder(this@ProcessingActivity)
-                        .setTitle("Recap မအောင်မြင်ပါ")
+                        .setTitle(L.s(this, "Recap မအောင်မြင်ပါ", "Recap failed"))
                         .setMessage(msg)
-                        .setPositiveButton("ပြန်သွားမည်") { d, _ -> finish() }
-                        .setNeutralButton("ထပ်စမ်းမည်") { d, _ ->
+                        .setPositiveButton(L.s(this, "ပြန်သွားမည်", "Go back")) { d, _ -> finish() }
+                        .setNeutralButton(L.s(this, "ထပ်စမ်းမည်", "Retry")) { d, _ ->
                             busy = false
                             lastProg = 0
                             bar.setProgress(0)
                             addLog("--- retry ---")
                             runPipeline()
                         }
-                        .setNegativeButton("အသေးစိတ်ကြည့်မည်") { d, _ -> d.dismiss() }
+                        .setNegativeButton(L.s(this, "အသေးစိတ်ကြည့်မည်", "See details")) { d, _ -> d.dismiss() }
                         .show()
                 }
             }
@@ -239,7 +306,7 @@ class ProcessingActivity : AppCompatActivity() {
         bp.setMargins(dp(28), dp(18), dp(28), 0)
         root.addView(bar, bp)
 
-        stepText.text = "စတင်နေသည်..."
+        stepText.text = L.s(this, "စတင်နေသည်...", "Starting...")
         stepText.setTextColor(Color.parseColor("#3DE8F8"))
         stepText.textSize = 14f
         stepText.gravity = Gravity.CENTER
