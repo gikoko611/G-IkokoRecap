@@ -312,6 +312,47 @@ object GeminiClient {
         }
     }
 
+    fun generatePlanTranscript(
+        baseUrl: String,
+        apiKey: String,
+        model: String,
+        transcript: String,
+        targetMinutes: Int,
+        lang: String,
+        full: Boolean,
+        style: String,
+        custom: String,
+        onLog: (String) -> Unit
+    ): RecapPlan {
+        val base = planPrompt(targetMinutes, lang, full, style, custom)
+        val prompt = base.replace("The video is provided below. ", "The video transcript with [mm:ss] timestamps is provided below as plain text. ") + "\n\nTRANSCRIPT:\n" + transcript
+        val msg = JSONObject().put("role", "user").put("content", prompt)
+        val body = JSONObject().put("model", model).put("messages", JSONArray().put(msg))
+        val req = Request.Builder()
+            .url(normalizeBase(baseUrl) + "/chat/completions")
+            .header("Authorization", "Bearer " + apiKey)
+            .post(body.toString().toRequestBody(JSON_MEDIA))
+            .build()
+        var attempt = 0
+        while (true) {
+            client.newCall(req).execute().use { resp ->
+                val txt = resp.body?.string() ?: ""
+                if (!resp.isSuccessful) {
+                    val retriable = resp.code >= 500 || resp.code == 429
+                    if (!retriable || attempt >= 2) throw IOException("HTTP " + resp.code + ": " + txt.take(400))
+                    attempt++
+                    return@use
+                }
+                val j = JSONObject(txt)
+                val choices = j.optJSONArray("choices") ?: throw IOException("No choices in response: " + txt.take(200))
+                val content = choices.getJSONObject(0).getJSONObject("message").optString("content", "")
+                onLog("Plan: " + content.take(300))
+                return parsePlan(content)
+            }
+            Thread.sleep(3000L * attempt)
+        }
+    }
+
     fun parsePlan(raw: String): RecapPlan {
         var s = raw.trim()
         val start = s.indexOf('{')
