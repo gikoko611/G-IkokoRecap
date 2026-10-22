@@ -350,7 +350,7 @@ class WatermarkActivity : AppCompatActivity() {
             val patch = Bitmap.createBitmap(f, sx, sy, sw, sh)
             val tiny = Bitmap.createScaledBitmap(patch, 14, 10, true)
             val mosaic = Bitmap.createScaledBitmap(tiny, rect.width().toInt().coerceAtLeast(2), rect.height().toInt().coerceAtLeast(2), false)
-            c.drawBitmap(mosaic, null, rect, Paint(Paint.FILTER_BITMAP))
+            c.drawBitmap(mosaic, null, rect, Paint(Paint.FILTER_BITMAP_FLAG))
         } else {
             val p = Paint()
             p.color = Color.argb(215, 10, 12, 20)
