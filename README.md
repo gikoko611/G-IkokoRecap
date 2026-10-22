@@ -1,27 +1,63 @@
-# GIkoko One Recap
+# GIkoko One Recap (Pro v2.0)
 
-[![Build](https://github.com/gikoko611/G-IkokoRecap/actions/workflows/android-build.yml/badge.svg)](https://github.com/gikoko611/G-IkokoRecap/actions/workflows/android-build.yml)
+AI video recap app - YouTube link ဒါမှမဟုတ် ဖုန်းထဲက video file ကနေ **အရေးကြီးတဲ့ အပိုင်းတွေချုံ**၊ မြန်မာ AI အသံ + မြန်မာစာတန်းထိုးနဲ့ တစ်ပွင့်တည်း recap video လုပ်ပေးတဲ့ Android app။
 
-One-click AI Video Recap Android app - မြန်မာအသံ + မြန်မာစာတန်းထိုး။
+## Features (Pro v2.0)
 
-## Features
-- Gemini API key ထည့်ပြီး အသုံးပြု (aistudio.google.com/apikey)
-- YouTube link (Gemini နဲ့ တိုက်ရိုက် ခြုံငုံ) ဒါမှမဟုတ် ဖုန်းထဲက video file upload
-- Recap အချိန်ရွေး: Auto / 1 / 3 / 5 မိနစ်
-- AI အသံမျိုးစုံ (Puck, Charon, Aoede, Zephyr, ...) 12 မျိုး
-- မြန်မာစာတန်းထိုး auto generate (SRT file ပါရမယ်)
-- အသံ၊ စာ၊ video တိုက်ရိုက်ညီအောင် TTS အချိန်အလိုက် video clip တွေ ဖြတ်တွေ့ပြီး ဖွဲ့စည်းသည်
-- Downloads ထဲ သိမ်း / Share
+- YouTube link နဲ့ recap (Gemini က video ကိုတိုက်ရိုက်လုပ်ဆောင်)
+- ဖုန်းထဲက video file upload (MP4/MOV/MKV/WebM/AVI/3GP) - Facebook/TikTok video တွေအတွက်
+- Myanmar AI voice မျိုးစုံ (Puck, Charon, Fenrir, Kore ... 12 မျိုး)
+- အသံ PREVIEW - မရွေးခင် စမ်းနားထောင်နိုင်
+- မြန်မာစာတန်းထိုး (SRT) အလိုအလျောက်ထွက်
+- Recap အချိန် ရွေးနိုင် - Auto / 1 / 3 / 5 မိနစ်
+- Segments mode - Compact (4-6) သို့ Full (6-12)
+- Narration ဘာသာ - မြန်မာ / English
+- Video quality - 720p / 1080p
+- Watermark ထည့်/ပယ်ဖျက်နိုင်
+- Intro / Outro branded card များ
+- Auto-save to Downloads (သော့ဖွင့်နိုင်)
+- History - လုပ်ခဲ့တဲ့ recap အားလုံး ပြန်ကြည့် / ပြန်ဖွင့် / မျှဝေ / ဖျက်
+- Settings page - API key ထည့်/စစ်ဆေး၊ model ရွေး (gemini-2.5-flash / gemini-2.0-flash)
+- Left drawer menu (ဘယ်ဘက်နှိပ် ဆွဲ)
+- Haptic feedback
+- Cache ရှင်းလင်းမှု
+- Share - Video / SRT / Text summary
+- Retry on error
+- Signed release APK (install မလုပ်နိုင်တာ ပြေလည်)
 
-## Build
-GitHub Actions က push တိုင်း build လုပ်ပြီး Releases ထဲ APK တင်သည်:
+## Gemini API Key
+
+1. https://aistudio.google.com/apikey မှာ အကောင့်ဝင်ပြီး API key တစ်ခု ဖန်တီးပါ
+2. App ထဲမှာ ဘယ်ဘက် ≡ ကိုနှိပ် → Settings → API key ထည့် → SAVE → TEST KEY
+3. 403 error ပေါ်ရင် - key မှားနေတာ ဒါမှမဟုတ် region block ဖြစ်နေတာပါ (VPN သုံးပြီး စမ်းကြည့်ပါ)
+
+## Download APK
+
+CI အလိုအလျောက် build လုပ်ပြီး signed APK release တင်ပေးမယ် -
 https://github.com/gikoko611/G-IkokoRecap/releases
 
-## Icon / Logo အစစ် ထည့်နည်း
-Binary JPEG များကို API နဲ့ မတင်နိုင်လို့ placeholder vector သုံးထားသည်။
-- Splash/Home logo: `app/src/main/res/drawable/img_splash_logo.xml` ကိုဖျက်ပြီး `img_splash_logo.png` (သို့) `.jpeg` အမည်တူထည့်ပါ။
-- App icon: `ic_monogram.xml` / `ic_launcher_background.xml` ကို လက်တွေ့ပုံအဖြစ်အစားထိုးပါ။
+GIkokoOneRecap-release.apk ကို ရွေးချယ်ပါ။
 
-## Notes
-- Facebook / TikTok link များကို Gemini က တိုက်ရိုက်မဖတ်နိုင်လို့ video file အဖြစ် upload လုပ်ရမည်။
-- Debug-signed APK: install ခံရန် "unknown sources" ခွင့်ပြုပါ။
+## Icon / Logo အစားထိုးခြင်း (စိတကြိုက်ပုံနဲ့)
+
+App icon နဲ့ logo ဟာ vector placeholder တွေပါ။ ကိုယ်ပိုင် JPEG ပုံတွေနဲ့ အစားထိုးချင်ရင် -
+
+1. GitHub web မှာ ဒီ repo ကိုဖွင့်ပါ
+2. app/src/main/res/drawable-nodpi/ folder အသစ်တည်ဆောက်ပါ (Add file → Create new file မှာ path ရိုက်)
+3. ပုံဖိုင်တွေကို upload ပြီး နာမည်တွေကို ဒီအတိုင်းပေးပါ -
+   - app_icon.jpg (512x512, square)
+   - app_logo.jpg (1280x720, 16:9)
+4. ပုံတွေကို အသုံးချချင်ရင် layout တွေထဲမှာ ImageView src အနေနဲ့ ညွှန်းပါ
+
+Vector drawables (ic_monogram.xml, img_splash_logo.xml) က gold/black cyber style နဲ့ ကိုယ်တိုင်ဆွဲထားတာပါ။
+
+## Tech
+
+- Kotlin, AndroidX, Material Components
+- Google Gemini API (generateContent + TTS)
+- Media3 Transformer (video composition + overlays)
+- GitHub Actions CI (signed APK auto-release)
+
+## Developer
+
+I Ko Ko - GIkoko One Recap
