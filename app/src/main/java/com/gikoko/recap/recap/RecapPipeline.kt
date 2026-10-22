@@ -7,6 +7,7 @@ import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.effect.OverlayEffect
+import androidx.media3.effect.Presentation
 import androidx.media3.effect.TextOverlay
 import androidx.media3.effect.TextureOverlay
 import androidx.media3.transformer.Composition
@@ -18,7 +19,6 @@ import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
 import com.google.common.collect.ImmutableList
 import com.gikoko.recap.net.GeminiClient
-import com.gikoko.recap.net.RecapPlan
 import com.gikoko.recap.net.Segment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -27,33 +27,43 @@ import java.io.File
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-data class RecapOutput(val video: File, val srt: File, val title: String)
+data class RecapConfig(
+    val apiKey: String,
+    val model: String,
+    val voice: String,
+    val targetMinutes: Int,
+    val wantCaptions: Boolean,
+    val lang: String,
+    val fullSegments: Boolean,
+    val watermark: Boolean,
+    val introOutro: Boolean,
+    val quality: Int
+)
+
+data class RecapOutput(val video: File, val srt: File, val title: String, val summary: String)
 
 object RecapPipeline {
 
     suspend fun runFromFile(
         context: Context,
         srcFile: File,
-        apiKey: String,
-        voice: String,
-        targetMinutes: Int,
-        wantCaptions: Boolean,
+        cfg: RecapConfig,
         onStep: (String) -> Unit,
         onLog: (String) -> Unit
     ): RecapOutput {
         val cache = File(context.cacheDir, "recap_work")
         cache.mkdirs()
+        onStep("Video ကို Gemini ဆီ တင်နေသည်...")
         val prep = withContext(Dispatchers.IO) {
-            onStep("Video ကို Gemini ဆီ တင်နေသည်...")
             val mime = GeminiClient.guessMime(srcFile.name)
-            val fileName = GeminiClient.uploadVideo(apiKey, srcFile, mime, srcFile.name)
+            val fileName = GeminiClient.uploadVideo(cfg.apiKey, srcFile, mime, srcFile.name)
             onLog("Upload: " + fileName)
-            val ready = GeminiClient.waitForFileReady(apiKey, fileName, onLog)
+            val ready = GeminiClient.waitForFileReady(cfg.apiKey, fileName, onLog)
             onStep("AI နဲ့ ခြုံငုံသုံးသပ်နေသည်...")
-            val p = GeminiClient.generatePlan(apiKey, ready, targetMinutes, onLog)
-            onStep("မြန်မာအသံ ထုတ်နေသည်...")
-            val w = genWavs(cache, apiKey, p.segments, voice, onLog)
-            Pair(p, w)
+            val plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, ready, cfg.targetMinutes, cfg.lang, cfg.fullSegments, onLog)
+            onStep("အသံထုတ်နေသည်...")
+            val w = genWavs(cache, cfg, plan.segments, onLog)
+            Pair(plan, w)
         }
         val plan = prep.first
         val wavs = prep.second
@@ -71,12 +81,15 @@ object RecapPipeline {
                 .setClippingConfiguration(clipping)
                 .build()
             val b = EditedMediaItem.Builder(mi).setRemoveAudio(true)
-            if (wantCaptions) {
+            val videoEffects = ArrayList<Effect>()
+            if (cfg.wantCaptions) {
                 val overlay = TextOverlay.createStaticTextOverlay(SpannableString(seg.text))
                 val texList: ImmutableList<TextureOverlay> = ImmutableList.of(overlay)
-                val effectList: List<Effect> = ImmutableList.of(OverlayEffect(texList))
-                b.setEffects(Effects(ImmutableList.of(), effectList))
+                videoEffects.add(OverlayEffect(texList))
             }
+            videoEffects.add(Presentation.createForHeight(if (cfg.quality == 0) 720 else 1080))
+            val effectList: List<Effect> = ImmutableList.copyOf(videoEffects)
+            b.setEffects(Effects(ImmutableList.of(), effectList))
             videoItems.add(b.build())
         }
         val audioItems = ArrayList<EditedMediaItem>()
@@ -91,28 +104,27 @@ object RecapPipeline {
         }
         val srt = File(cache, "recap.srt")
         withContext(Dispatchers.IO) {
-            srt.writeText(buildSrt(plan.segments, wavs))
+            srt.writeText(buildSrt(plan.segments, wavs, 0))
         }
-        return RecapOutput(out, srt, plan.title)
+        val summary = plan.segments.joinToString(" ") { s -> s.text }
+        return RecapOutput(out, srt, plan.title, summary)
     }
 
     suspend fun runFromYouTube(
         context: Context,
         url: String,
-        apiKey: String,
-        voice: String,
-        targetMinutes: Int,
+        cfg: RecapConfig,
         onStep: (String) -> Unit,
         onLog: (String) -> Unit
     ): RecapOutput {
         val cache = File(context.cacheDir, "recap_work")
         cache.mkdirs()
+        onStep("Gemini နဲ့ Video ခြုံငုံနေသည်...")
         val prep = withContext(Dispatchers.IO) {
-            onStep("Gemini နဲ့ Video ခြုံငုံနေသည်...")
-            val p = GeminiClient.generatePlan(apiKey, url, targetMinutes, onLog)
-            onStep("မြန်မာအသံ ထုတ်နေသည်...")
-            val w = genWavs(cache, apiKey, p.segments, voice, onLog)
-            Pair(p, w)
+            val plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, url, cfg.targetMinutes, cfg.lang, cfg.fullSegments, onLog)
+            onStep("အသံထုတ်နေသည်...")
+            val w = genWavs(cache, cfg, plan.segments, onLog)
+            Pair(plan, w)
         }
         val plan = prep.first
         val wavs = prep.second
@@ -121,17 +133,23 @@ object RecapPipeline {
         withContext(Dispatchers.IO) {
             for (i in plan.segments.indices) {
                 val f = File(cache, "frame_" + i + ".jpg")
-                FrameRenderer.render(plan.title, plan.segments[i].text, i, f)
+                FrameRenderer.render(plan.title, plan.segments[i].text, i, f, cfg.watermark)
+            }
+            if (cfg.introOutro) {
+                FrameRenderer.renderBranded(File(cache, "intro.jpg"), true, cfg.watermark)
+                FrameRenderer.renderBranded(File(cache, "outro.jpg"), false, cfg.watermark)
             }
         }
         val videoItems = ArrayList<EditedMediaItem>()
+        if (cfg.introOutro) {
+            videoItems.add(imageItem(File(cache, "intro.jpg"), 2500000L))
+        }
         for (i in plan.segments.indices) {
             val durMs = WavUtil.wavDurationMs(wavs[i].readBytes())
-            val mi = MediaItem.Builder()
-                .setUri(Uri.fromFile(File(cache, "frame_" + i + ".jpg")))
-                .setMimeType(MimeTypes.IMAGE_JPEG)
-                .build()
-            videoItems.add(EditedMediaItem.Builder(mi).setDurationUs(durMs * 1000L).build())
+            videoItems.add(imageItem(File(cache, "frame_" + i + ".jpg"), durMs * 1000L))
+        }
+        if (cfg.introOutro) {
+            videoItems.add(imageItem(File(cache, "outro.jpg"), 2500000L))
         }
         val audioItems = ArrayList<EditedMediaItem>()
         for (w in wavs) {
@@ -145,22 +163,30 @@ object RecapPipeline {
         }
         val srt = File(cache, "recap.srt")
         withContext(Dispatchers.IO) {
-            srt.writeText(buildSrt(plan.segments, wavs))
+            srt.writeText(buildSrt(plan.segments, wavs, if (cfg.introOutro) 2500 else 0))
         }
-        return RecapOutput(out, srt, plan.title)
+        val summary = plan.segments.joinToString(" ") { s -> s.text }
+        return RecapOutput(out, srt, plan.title, summary)
+    }
+
+    private fun imageItem(f: File, durUs: Long): EditedMediaItem {
+        val mi = MediaItem.Builder()
+            .setUri(Uri.fromFile(f))
+            .setMimeType(MimeTypes.IMAGE_JPEG)
+            .build()
+        return EditedMediaItem.Builder(mi).setDurationUs(durUs).build()
     }
 
     private suspend fun genWavs(
         cache: File,
-        apiKey: String,
+        cfg: RecapConfig,
         segs: List<Segment>,
-        voice: String,
         onLog: (String) -> Unit
     ): ArrayList<File> = withContext(Dispatchers.IO) {
         val list = ArrayList<File>()
         for (i in segs.indices) {
-            onLog("TTS segment " + (i + 1) + "/" + segs.size + " voice=" + voice)
-            val (pcm, rate) = GeminiClient.generateTts(apiKey, segs[i].text, voice)
+            onLog("TTS segment " + (i + 1) + "/" + segs.size + " voice=" + cfg.voice)
+            val (pcm, rate) = GeminiClient.generateTts(cfg.apiKey, segs[i].text, cfg.voice)
             val wav = WavUtil.pcmToWav(pcm, rate)
             val f = File(cache, "seg_" + i + ".wav")
             f.writeBytes(wav)
@@ -209,9 +235,9 @@ object RecapPipeline {
 
     private var composeDone: ((ExportException?) -> Unit)? = null
 
-    fun buildSrt(segments: List<Segment>, wavs: List<File>): String {
+    fun buildSrt(segments: List<Segment>, wavs: List<File>, offsetMs: Long): String {
         val sb = StringBuilder()
-        var t = 0L
+        var t = offsetMs
         for (i in segments.indices) {
             val d = WavUtil.wavDurationMs(wavs[i].readBytes())
             val start = t

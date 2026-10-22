@@ -13,14 +13,23 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.gikoko.recap.recap.DownloadsUtil
+import com.gikoko.recap.recap.RecapConfig
 import com.gikoko.recap.recap.RecapPipeline
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class ProcessingActivity : AppCompatActivity() {
 
     private lateinit var stepText: TextView
     private lateinit var logText: TextView
+    private var busy = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,25 +38,36 @@ class ProcessingActivity : AppCompatActivity() {
         stepText = TextView(this)
         logText = TextView(this)
         build(root)
+        runPipeline()
+    }
 
-        val apiKey = intent.getStringExtra("api_key") ?: ""
-        val voice = intent.getStringExtra("voice") ?: "Puck"
-        val minutes = intent.getIntExtra("minutes", 0)
-        val captions = intent.getBooleanExtra("captions", true)
+    private fun runPipeline() {
+        if (busy) return
+        busy = true
+        val saved = Prefs.apiKey(this)
+        val apiKey = if (saved.isNotEmpty()) saved else (intent.getStringExtra("api_key") ?: "")
+        val cfg = RecapConfig(
+            apiKey,
+            Prefs.model(this),
+            Prefs.voice(this),
+            Prefs.minutes(this),
+            Prefs.captions(this),
+            Prefs.lang(this),
+            Prefs.segFull(this),
+            Prefs.watermark(this),
+            Prefs.introOutro(this),
+            Prefs.quality(this)
+        )
         val source = intent.getStringExtra("source") ?: "youtube"
         val url = intent.getStringExtra("url") ?: ""
         val path = intent.getStringExtra("path") ?: ""
-
         lifecycleScope.launch {
             try {
                 val out = if (source == "file") {
                     RecapPipeline.runFromFile(
                         this@ProcessingActivity,
                         File(path),
-                        apiKey,
-                        voice,
-                        minutes,
-                        captions,
+                        cfg,
                         { s -> runOnUiThread { stepText.text = s } },
                         { s -> runOnUiThread { logText.append(s + "\n") } }
                     )
@@ -55,17 +75,39 @@ class ProcessingActivity : AppCompatActivity() {
                     RecapPipeline.runFromYouTube(
                         this@ProcessingActivity,
                         url,
-                        apiKey,
-                        voice,
-                        minutes,
+                        cfg,
                         { s -> runOnUiThread { stepText.text = s } },
                         { s -> runOnUiThread { logText.append(s + "\n") } }
                     )
                 }
+                stepText.text = "Recap သိမ်းနေသည်..."
+                val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                val srcName = if (source == "file") File(path).name else url
+                val archiveVideo = withContext(Dispatchers.IO) {
+                    val dir = File(filesDir, "recap_archive/" + stamp)
+                    dir.mkdirs()
+                    val v = File(dir, "recap.mp4")
+                    out.video.copyTo(v, overwrite = true)
+                    val s = File(dir, "recap.srt")
+                    if (out.srt.exists()) out.srt.copyTo(s, overwrite = true)
+                    val meta = JSONObject()
+                    meta.put("title", out.title)
+                    meta.put("date", stamp)
+                    meta.put("source", srcName)
+                    meta.put("summary", out.summary)
+                    File(dir, "meta.json").writeText(meta.toString())
+                    v
+                }
+                if (Prefs.autosave(this@ProcessingActivity)) {
+                    withContext(Dispatchers.IO) {
+                        DownloadsUtil.saveRecap(this@ProcessingActivity, archiveVideo, out.srt)
+                    }
+                }
                 val i = Intent(this@ProcessingActivity, ResultActivity::class.java)
-                i.putExtra("video", out.video.absolutePath)
+                i.putExtra("video", archiveVideo.absolutePath)
                 i.putExtra("srt", out.srt.absolutePath)
                 i.putExtra("title", out.title)
+                i.putExtra("summary", out.summary)
                 startActivity(i)
                 finish()
             } catch (e: Exception) {
@@ -76,6 +118,10 @@ class ProcessingActivity : AppCompatActivity() {
                         .setTitle("Recap မအောင်မြင်ပါ")
                         .setMessage(msg)
                         .setPositiveButton("ပြန်သွားမည်") { d, _ -> finish() }
+                        .setNeutralButton("ထပ်စမ်းမည်") { d, _ ->
+                            busy = false
+                            runPipeline()
+                        }
                         .setNegativeButton("အသေးစိတ်ကြည့်မည်") { d, _ -> d.dismiss() }
                         .show()
                 }

@@ -1,14 +1,11 @@
 package com.gikoko.recap
 
-import android.content.ContentValues
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.os.Environment
-import android.provider.MediaStore
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.Button
@@ -20,13 +17,15 @@ import androidx.core.content.FileProvider
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import com.gikoko.recap.recap.DownloadsUtil
 import java.io.File
 
 class ResultActivity : AppCompatActivity() {
 
     private var player: ExoPlayer? = null
     private lateinit var videoFile: File
-    private lateinit var srtFile: File
+    private var srtFile: File? = null
+    private var summaryText: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,13 +34,14 @@ class ResultActivity : AppCompatActivity() {
         val vPath = intent.getStringExtra("video") ?: ""
         val sPath = intent.getStringExtra("srt") ?: ""
         val title = intent.getStringExtra("title") ?: "Recap"
-        if (vPath.isEmpty()) {
-            Toast.makeText(this, "Video not found", Toast.LENGTH_LONG).show()
+        summaryText = intent.getStringExtra("summary") ?: ""
+        if (vPath.isEmpty() || !File(vPath).exists()) {
+            Toast.makeText(this, "Video မတွေ့ပါ", Toast.LENGTH_LONG).show()
             finish()
             return
         }
         videoFile = File(vPath)
-        srtFile = File(sPath)
+        srtFile = if (sPath.isNotEmpty() && File(sPath).exists()) File(sPath) else null
 
         val head = TextView(this)
         head.text = title
@@ -69,20 +69,50 @@ class ResultActivity : AppCompatActivity() {
         player?.prepare()
         player?.playWhenReady = true
 
+        if (summaryText.isNotEmpty()) {
+            val sum = TextView(this)
+            sum.text = summaryText
+            sum.setTextColor(Color.parseColor("#C9D2EC"))
+            sum.textSize = 13f
+            sum.maxLines = 5
+            sum.ellipsize = TextUtils.TruncateAt.END
+            sum.setPadding(dp(12), dp(10), dp(12), dp(4))
+            root.addView(sum)
+        }
+
         val row = LinearLayout(this)
         row.orientation = LinearLayout.HORIZONTAL
         val rp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        rp.setMargins(dp(12), dp(12), dp(12), dp(16))
+        rp.setMargins(dp(12), dp(12), dp(12), dp(4))
         root.addView(row, rp)
 
         val save = btn("သိမ်းမည်", R.drawable.bg_gold_btn, "#0A0A00")
-        val share = btn("Share", R.drawable.bg_chip_selected, "#F2F5FF")
+        val share = btn("Share Video", R.drawable.bg_chip_selected, "#F2F5FF")
         val again = btn("အသစ်လုပ်မည်", R.drawable.bg_mode_card, "#C9D2EC")
         row.addView(save, btnParams())
         row.addView(share, btnParams())
         row.addView(again, btnParams())
 
-        save.setOnClickListener { saveToDownloads() }
+        val srt = srtFile
+        if (srt != null || summaryText.isNotEmpty()) {
+            val row2 = LinearLayout(this)
+            row2.orientation = LinearLayout.HORIZONTAL
+            val rp2 = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            rp2.setMargins(dp(12), dp(4), dp(12), dp(16))
+            root.addView(row2, rp2)
+            if (srt != null) {
+                val shSrt = btn("Share SRT", R.drawable.bg_mode_card, "#C9D2EC")
+                row2.addView(shSrt, btnParams())
+                shSrt.setOnClickListener { shareSrt() }
+            }
+            if (summaryText.isNotEmpty()) {
+                val shTxt = btn("Share Text", R.drawable.bg_mode_card, "#C9D2EC")
+                row2.addView(shTxt, btnParams())
+                shTxt.setOnClickListener { shareText() }
+            }
+        }
+
+        save.setOnClickListener { saveRecap() }
         share.setOnClickListener { shareRecap() }
         again.setOnClickListener {
             startActivity(Intent(this, HomeActivity::class.java))
@@ -106,47 +136,14 @@ class ResultActivity : AppCompatActivity() {
         return p
     }
 
-    private fun saveToDownloads() {
-        try {
-            if (Build.VERSION.SDK_INT >= 29) {
-                val resolver = contentResolver
-                val stamp = System.currentTimeMillis()
-                val values = ContentValues()
-                values.put(MediaStore.Downloads.DISPLAY_NAME, "GIkokoRecap_" + stamp + ".mp4")
-                values.put(MediaStore.Downloads.MIME_TYPE, "video/mp4")
-                values.put(MediaStore.Downloads.IS_PENDING, 1)
-                val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                    ?: throw IllegalStateException("Download entry မလုပ်နိုင်ပါ")
-                val out = resolver.openOutputStream(uri) ?: throw IllegalStateException("Write failed")
-                out.use { o -> videoFile.inputStream().use { it.copyTo(o) } }
-                values.clear()
-                values.put(MediaStore.Downloads.IS_PENDING, 0)
-                resolver.update(uri, values, null, null)
-                if (srtFile.exists()) {
-                    val v2 = ContentValues()
-                    v2.put(MediaStore.Downloads.DISPLAY_NAME, "GIkokoRecap_" + stamp + ".srt")
-                    v2.put(MediaStore.Downloads.MIME_TYPE, "application/x-subrip")
-                    v2.put(MediaStore.Downloads.IS_PENDING, 1)
-                    val u2 = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v2)
-                    if (u2 != null) {
-                        val o2 = resolver.openOutputStream(u2)
-                        if (o2 != null) {
-                            o2.use { oo -> srtFile.inputStream().use { it.copyTo(oo) } }
-                        }
-                        v2.clear()
-                        v2.put(MediaStore.Downloads.IS_PENDING, 0)
-                        resolver.update(u2, v2, null, null)
-                    }
-                }
-            } else {
-                val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                dir.mkdirs()
-                videoFile.copyTo(File(dir, videoFile.name), overwrite = true)
-                if (srtFile.exists()) srtFile.copyTo(File(dir, srtFile.name), overwrite = true)
-            }
+    private fun saveRecap() {
+        val srt = srtFile
+        val okSrt = if (srt != null && srt.exists()) srt else null
+        val ok = DownloadsUtil.saveRecap(this, videoFile, okSrt)
+        if (ok) {
             Toast.makeText(this, "Downloads ထဲမှာ သိမ်းပြီးပါပြီ", Toast.LENGTH_LONG).show()
-        } catch (e: Exception) {
-            Toast.makeText(this, "သိမ်းမအောင်မြင်: " + (e.message ?: ""), Toast.LENGTH_LONG).show()
+        } else {
+            Toast.makeText(this, "သိမ်းမအောင်မြင်ပါ", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -162,6 +159,28 @@ class ResultActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Toast.makeText(this, "Share failed: " + (e.message ?: ""), Toast.LENGTH_LONG).show()
         }
+    }
+
+    private fun shareSrt() {
+        val srt = srtFile ?: return
+        try {
+            val uri = FileProvider.getUriForFile(this, packageName + ".fileprovider", srt)
+            val send = Intent(Intent.ACTION_SEND)
+            send.type = "application/x-subrip"
+            send.putExtra(Intent.EXTRA_STREAM, uri)
+            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivity(Intent.createChooser(send, "စာတန်းထိုး မျှဝေမည်"))
+        } catch (e: Exception) {
+            Toast.makeText(this, "Share failed: " + (e.message ?: ""), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun shareText() {
+        val send = Intent(Intent.ACTION_SEND)
+        send.type = "text/plain"
+        send.putExtra(Intent.EXTRA_SUBJECT, "GIkoko One Recap")
+        send.putExtra(Intent.EXTRA_TEXT, summaryText)
+        startActivity(Intent.createChooser(send, "Recap စာသား မျှဝေမည်"))
     }
 
     override fun onStart() {
