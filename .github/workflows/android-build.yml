@@ -27,33 +27,47 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build debug APK
+      - name: Generate signing keystore
+        shell: bash
+        run: |
+          keytool -genkeypair -v \
+            -keystore ci-release.keystore \
+            -storepass gikoko123 -keypass gikoko123 \
+            -alias gikoko -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=GIkoko One Recap, OU=Mobile, O=GiKoko, L=Yangon, C=MM"
+
+      - name: Build release APK
         shell: bash
         run: |
           set -o pipefail
-          gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+          gradle assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
+
+      - name: Verify APK signature
+        shell: bash
+        run: |
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk
 
       - name: Rename APK
         shell: bash
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/debug/*.apk out/GIkokoOneRecap-debug.apk
+          cp app/build/outputs/apk/release/app-release.apk out/GIkokoOneRecap-release.apk
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GIkokoOneRecap-debug
-          path: out/GIkokoOneRecap-debug.apk
+          name: GIkokoOneRecap-release
+          path: out/GIkokoOneRecap-release.apk
 
       - name: Create Release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v1.0.$GITHUB_RUN_NUMBER"
-          gh release create "$TAG" out/GIkokoOneRecap-debug.apk \
+          TAG="v1.1.$GITHUB_RUN_NUMBER"
+          gh release create "$TAG" out/GIkokoOneRecap-release.apk \
             --title "GIkoko One Recap $TAG" \
-            --notes "One-click AI video recap with Myanmar voice and captions. Debug APK." \
+            --notes "One-click AI video recap with Myanmar voice and captions. Release-signed APK." \
             --target "$GITHUB_SHA" || true
 
       - name: Post build log on failure
@@ -66,7 +80,5 @@ jobs:
             echo "# CI build failed - debug log"
             echo
             tail -n 400 build.log || true
-            echo
-            grep -n -i "error\|FAILED" build.log | tail -n 40 || true
           } > /tmp/body.md
           gh issue create --title "CI build failed - debug log" --body-file /tmp/body.md || true
