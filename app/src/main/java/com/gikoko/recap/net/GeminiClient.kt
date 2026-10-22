@@ -19,6 +19,7 @@ object GeminiClient {
 
     private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
     private const val BASE = "https://generativelanguage.googleapis.com"
+    const val TTS_MODEL = "gemini-2.5-flash-preview-tts"
 
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
@@ -41,6 +42,16 @@ object GeminiClient {
             n.endsWith(".avi") -> "video/avi"
             n.endsWith(".3gp") -> "video/3gpp"
             else -> "video/mp4"
+        }
+    }
+
+    fun testKey(apiKey: String): String {
+        val req = Request.Builder().url(BASE + "/v1beta/models?key=" + apiKey).get().build()
+        client.newCall(req).execute().use { resp ->
+            val txt = resp.body?.string() ?: ""
+            if (!resp.isSuccessful) throw IOException("HTTP " + resp.code + ": " + txt.take(300))
+            val arr = JSONObject(txt).optJSONArray("models") ?: JSONArray()
+            return "OK - models: " + arr.length()
         }
     }
 
@@ -119,23 +130,43 @@ object GeminiClient {
         throw IOException("Timeout waiting for video upload")
     }
 
-    fun generatePlan(apiKey: String, videoUri: String, targetMinutes: Int, onLog: (String) -> Unit): RecapPlan {
+    fun generatePlan(
+        apiKey: String,
+        model: String,
+        videoUri: String,
+        targetMinutes: Int,
+        lang: String,
+        full: Boolean,
+        onLog: (String) -> Unit
+    ): RecapPlan {
         val targetTxt = if (targetMinutes <= 0) "about 3 minutes" else ("about " + targetMinutes + " minutes")
-        val prompt = "You are a video recap editor. The video is provided below. " +
-            "Create a short recap narration plan in Myanmar (Burmese) language. " +
-            "The narration, when spoken, should total " + targetTxt + ". " +
-            "Pick the most important moments of the video. " +
-            "Return STRICT JSON only, in this exact shape: " +
-            "{\"title\":\"short title in Myanmar\",\"segments\":[{\"startSec\":123,\"endSec\":456,\"text\":\"Myanmar narration text\"}]} " +
-            "Use 4 to 10 segments. Each segment text must be one or two Myanmar sentences that summarize that part of the video. " +
-            "Each segment must be between 15 and 90 seconds long. No markdown, JSON only."
+        val segTxt = if (full) "6 to 12 segments" else "4 to 6 segments"
+        val prompt = if (lang == "en") {
+            "You are a video recap editor. The video is provided below. " +
+                "Create a short recap narration plan in ENGLISH language. " +
+                "The narration, when spoken, should total " + targetTxt + ". " +
+                "Pick the most important moments of the video. " +
+                "Return STRICT JSON only, in this exact shape: " +
+                "{\"title\":\"short title in English\",\"segments\":[{\"startSec\":123,\"endSec\":456,\"text\":\"English narration text\"}]} " +
+                "Use " + segTxt + ". Each segment text must be one or two English sentences that summarize that part of the video. " +
+                "Each segment must be between 15 and 90 seconds long. No markdown, JSON only."
+        } else {
+            "You are a video recap editor. The video is provided below. " +
+                "Create a short recap narration plan in Myanmar (Burmese) language. " +
+                "The narration, when spoken, should total " + targetTxt + ". " +
+                "Pick the most important moments of the video. " +
+                "Return STRICT JSON only, in this exact shape: " +
+                "{\"title\":\"short title in Myanmar\",\"segments\":[{\"startSec\":123,\"endSec\":456,\"text\":\"Myanmar narration text\"}]} " +
+                "Use " + segTxt + ". Each segment text must be one or two Myanmar sentences that summarize that part of the video. " +
+                "Each segment must be between 15 and 90 seconds long. No markdown, JSON only."
+        }
         val textPart = JSONObject().put("text", prompt)
         val filePart = JSONObject().put("file_data", JSONObject().put("file_uri", videoUri))
         val content = JSONObject().put("parts", JSONArray().put(textPart).put(filePart))
         val body = JSONObject()
             .put("contents", JSONArray().put(content))
             .put("generationConfig", JSONObject().put("temperature", 0.4).put("response_mime_type", "application/json"))
-        val resp = post(apiKey, "/v1beta/models/gemini-2.0-flash:generateContent", body.toString())
+        val resp = post(apiKey, "/v1beta/models/" + model + ":generateContent", body.toString())
         val txt = resp.getJSONArray("candidates").getJSONObject(0)
             .getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
         onLog("Plan: " + txt.take(300))
@@ -164,13 +195,13 @@ object GeminiClient {
     }
 
     fun generateTts(apiKey: String, text: String, voice: String): Pair<ByteArray, Int> {
-        val spoken = "အောက်ပါ မြန်မာစာကို သဘာဝကျစွာ ဖတ်ပြပါ: " + text
+        val spoken = if (text.contains(" ")) text else text
         val body = JSONObject()
             .put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject().put("text", spoken)))))
             .put("generationConfig", JSONObject()
                 .put("responseModalities", JSONArray().put("AUDIO"))
                 .put("speechConfig", JSONObject().put("voiceConfig", JSONObject().put("prebuiltVoiceConfig", JSONObject().put("voiceName", voice)))))
-        val resp = post(apiKey, "/v1beta/models/gemini-2.5-flash-preview-tts:generateContent", body.toString())
+        val resp = post(apiKey, "/v1beta/models/" + TTS_MODEL + ":generateContent", body.toString())
         val parts = resp.getJSONArray("candidates").getJSONObject(0)
             .getJSONObject("content").getJSONArray("parts")
         var data = ""
