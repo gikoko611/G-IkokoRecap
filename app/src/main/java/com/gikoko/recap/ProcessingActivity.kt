@@ -123,7 +123,14 @@ class ProcessingActivity : AppCompatActivity() {
             Prefs.wmPos(this),
             Prefs.wmLogo(this),
             Prefs.theme(this),
-            Prefs.planConfirm(this)
+            Prefs.planConfirm(this),
+            Prefs.shorts(this),
+            Prefs.podcast(this),
+            Prefs.dialogue(this),
+            Prefs.voice2(this),
+            Prefs.bgmOn(this),
+            Prefs.bgmPath(this),
+            Prefs.bgmVol(this).toDouble()
         )
         val source = intent.getStringExtra("source") ?: "youtube"
         val url = intent.getStringExtra("url") ?: ""
@@ -222,6 +229,8 @@ class ProcessingActivity : AppCompatActivity() {
                     out.video.copyTo(v, overwrite = true)
                     val s = File(dir, "recap.srt")
                     if (out.srt.exists()) out.srt.copyTo(s, overwrite = true)
+                    if (out.shorts != null && out.shorts.exists()) out.shorts.copyTo(File(dir, "short.mp4"), overwrite = true)
+                    if (out.podcast != null && out.podcast.exists()) out.podcast.copyTo(File(dir, "podcast.m4a"), overwrite = true)
                     val meta = JSONObject()
                     meta.put("title", out.title)
                     meta.put("date", stamp)
@@ -256,6 +265,11 @@ class ProcessingActivity : AppCompatActivity() {
                 i.putExtra("title", out.title)
                 i.putExtra("summary", out.summary)
                 i.putExtra("thumb", File(archiveVideo.parentFile, "thumb.jpg").absolutePath)
+                val shortF = File(archiveVideo.parentFile, "short.mp4")
+                if (shortF.exists()) i.putExtra("short", shortF.absolutePath)
+                val podF = File(archiveVideo.parentFile, "podcast.m4a")
+                if (podF.exists()) i.putExtra("podcast", podF.absolutePath)
+                if (source == "youtube") i.putExtra("source_url", url)
                 startActivity(i)
                 finish()
             } catch (e: Exception) {

@@ -44,6 +44,16 @@ object Prefs {
     const val KEY_U_TTS = "usage_tts"
     const val KEY_U_EXT = "usage_ext"
     const val KEY_U_ASR = "usage_asr"
+    const val KEY_SHORTS = "auto_shorts"
+    const val KEY_BGM_ON = "bgm_on"
+    const val KEY_BGM_PATH = "bgm_path"
+    const val KEY_BGM_VOL = "bgm_vol"
+    const val KEY_DIALOGUE = "dialogue_mode"
+    const val KEY_VOICE2 = "voice2"
+    const val KEY_CLONE_SAMPLE = "clone_sample"
+    const val KEY_CLONE_VOICE = "clone_voice"
+    const val KEY_CLONE_STYLE = "clone_style"
+    const val KEY_PODCAST = "podcast_export"
 
     private val validModels = setOf("gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.8-flash-lite")
     private val validVoices = setOf("Sulafat", "Vindemiatrix", "Erinome", "Aoede", "Kore", "Leda", "Zephyr", "Despina", "Charon", "Iapetus", "Achird", "Orus", "Puck", "Fenrir", "Algenib", "Rasalgethi")
@@ -143,6 +153,17 @@ object Prefs {
     fun theme(ctx: Context): String = str(ctx, KEY_THEME, "gold")
     fun uiLang(ctx: Context): String = str(ctx, KEY_UI_LANG, "mm")
     fun planConfirm(ctx: Context): Boolean = bool(ctx, KEY_PLAN_CONFIRM, true)
+
+    fun shorts(ctx: Context): Boolean = bool(ctx, KEY_SHORTS, false)
+    fun bgmOn(ctx: Context): Boolean = bool(ctx, KEY_BGM_ON, false)
+    fun bgmPath(ctx: Context): String = str(ctx, KEY_BGM_PATH, "")
+    fun bgmVol(ctx: Context): String = str(ctx, KEY_BGM_VOL, "0.2")
+    fun dialogue(ctx: Context): Boolean = bool(ctx, KEY_DIALOGUE, false)
+    fun voice2(ctx: Context): String = str(ctx, KEY_VOICE2, "Kore")
+    fun cloneSample(ctx: Context): String = str(ctx, KEY_CLONE_SAMPLE, "")
+    fun cloneVoice(ctx: Context): String = str(ctx, KEY_CLONE_VOICE, "")
+    fun cloneStyle(ctx: Context): String = str(ctx, KEY_CLONE_STYLE, "")
+    fun podcast(ctx: Context): Boolean = bool(ctx, KEY_PODCAST, false)
 
     fun today(ctx: Context): String = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
 
