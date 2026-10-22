@@ -38,6 +38,8 @@ class HomeActivity : AppCompatActivity() {
     private val voices = listOf("Sulafat", "Vindemiatrix", "Erinome", "Aoede", "Kore", "Leda", "Zephyr", "Despina", "Charon", "Iapetus", "Achird", "Orus", "Puck", "Fenrir", "Algenib", "Rasalgethi")
     private val lengths = listOf("Auto", "1 min", "3 min", "5 min")
     private val minutesOf = intArrayOf(0, 1, 3, 5)
+    private val styles = listOf("summary", "talk", "tech", "story", "highlights", "news", "funny", "eli5", "lesson", "trailer")
+    private val styleLabels = listOf("ခြုံငုံသုံးသပ်", "စကားပြောပုံစံ", "နည်းပညာရှင်းပြ", "ဇာတ်လမ်းသုံးသပ်", "အဓိကအချက်", "သတင်းပုံစံ", "ဟာသပေါင်းပြော", "ရိုးရှင်းလင်းလင်း", "သင်ခန်းစာ", "Trailer ပုံစံ")
 
     private var mode = "youtube"
     private var pickedFile: File? = null
@@ -72,6 +74,12 @@ class HomeActivity : AppCompatActivity() {
         buildDrawer(panel)
         buildUi(root)
         maybeShowCrash()
+        val shared = intent.getStringExtra(Intent.EXTRA_TEXT)
+        if (!shared.isNullOrBlank() && (shared.contains("youtube.com") || shared.contains("youtu.be"))) {
+            linkInput.setText(shared.trim())
+            setMode("youtube")
+            Toast.makeText(this, "YouTube link ရပါပြီ - START နှိပ်ပါ", Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onResume() {
@@ -194,8 +202,51 @@ class HomeActivity : AppCompatActivity() {
                 .show()
         })
 
+        val followHead = TextView(this)
+        followHead.text = "CONTACT"
+        followHead.textSize = 11f
+        followHead.setTextColor(Color.parseColor("#3DE8F8"))
+        followHead.letterSpacing = 0.2f
+        followHead.setPadding(dp(12), dp(28), dp(12), dp(6))
+        panel.addView(followHead)
+
+        val social = LinearLayout(this)
+        social.orientation = LinearLayout.HORIZONTAL
+        social.setPadding(dp(12), 0, dp(12), 0)
+
+        fun socialCircle(label: String, bg: Int, url: String, mailto: Boolean) {
+            val tv = TextView(this)
+            tv.text = label
+            tv.textSize = 17f
+            tv.setTypeface(null, Typeface.BOLD)
+            tv.setTextColor(Color.parseColor("#FFFFFF"))
+            tv.gravity = Gravity.CENTER
+            tv.setBackgroundResource(bg)
+            val lp = LinearLayout.LayoutParams(dp(44), dp(44))
+            lp.rightMargin = dp(10)
+            social.addView(tv, lp)
+            tv.setOnClickListener {
+                if (mailto) {
+                    startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:" + url)))
+                } else {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                }
+            }
+        }
+        socialCircle("f", R.drawable.bg_circle_fb, "https://www.facebook.com/profile.php?id=61592311041041&mibextid=ZbWKwL", false)
+        socialCircle("M", R.drawable.bg_circle_gmail, "gikoko611@gmail.com", true)
+        socialCircle("G", R.drawable.bg_circle_github, "https://github.com/gikoko611", false)
+        panel.addView(social)
+
+        val followNote = TextView(this)
+        followNote.text = "f Facebook • M Gmail • G GitHub"
+        followNote.textSize = 10f
+        followNote.setTextColor(Color.parseColor("#5A6480"))
+        followNote.setPadding(dp(12), dp(6), dp(12), 0)
+        panel.addView(followNote)
+
         val foot = TextView(this)
-        foot.text = "v2.1.1 Pro"
+        foot.text = "v0.0.1 Pro"
         foot.textSize = 11f
         foot.setTextColor(Color.parseColor("#5A6480"))
         val fp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
@@ -404,7 +455,56 @@ class HomeActivity : AppCompatActivity() {
         segsFull = Prefs.segFull(this)
         sg.check(if (segsFull) 3101 else 3100)
         c3.addView(sg)
+
+        c3.addView(sectionTitle("FORMAT"))
+        val fmtGroup = ChipGroup(this)
+        fmtGroup.isSingleSelection = true
+        fmtGroup.isSelectionRequired = true
+        val fmtLabels = listOf("16:9 Landscape", "9:16 Shorts")
+        fmtLabels.forEachIndexed { i, s ->
+            val ch = chipOf(s)
+            ch.id = 7000 + i
+            ch.setOnCheckedChangeListener { _, checked ->
+                if (checked) Prefs.save(this, Prefs.KEY_VERTICAL, if (i == 1) "1" else "0")
+            }
+            fmtGroup.addView(ch)
+        }
+        fmtGroup.check(if (Prefs.vertical(this)) 7001 else 7000)
+        c3.addView(fmtGroup)
         root.addView(c3)
+
+        val cStyle = card()
+        cStyle.addView(sectionTitle("RECAP • ပုံစံ - STYLE"))
+        val styleGroup = ChipGroup(this)
+        styleGroup.isSingleSelection = true
+        styleGroup.isSelectionRequired = true
+        styleLabels.forEachIndexed { i, s ->
+            val ch = chipOf(s)
+            ch.id = 5000 + i
+            ch.setOnCheckedChangeListener { _, checked ->
+                if (checked) Prefs.save(this, Prefs.KEY_STYLE, styles[i])
+            }
+            styleGroup.addView(ch)
+        }
+        val curStyle = Prefs.style(this)
+        val sti = styles.indexOf(curStyle)
+        styleGroup.check(if (sti >= 0) 5000 + sti else 5000)
+        cStyle.addView(styleGroup)
+        val styleNote = TextView(this)
+        styleNote.text = "Recap ကို ဘယ်ပုံစံနဲ့ ပြောပြမလဲ ရွေးချယ်ပါ"
+        styleNote.setTextColor(Color.parseColor("#8A93B2"))
+        styleNote.textSize = 11f
+        styleNote.setPadding(0, dp(8), 0, 0)
+        cStyle.addView(styleNote)
+
+        val customStyleInput = EditText(this)
+        customStyleInput.hint = "ကိုယ်ပိုင် style ညွှန်ကြားချက် (optional)"
+        inputStyle(customStyleInput)
+        customStyleInput.setText(Prefs.customStyle(this))
+        val csiP = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        csiP.topMargin = dp(10)
+        cStyle.addView(customStyleInput, csiP)
+        root.addView(cStyle)
 
         val c4 = card()
         c4.addView(sectionTitle("AI \u2022 အသံမျိုးစုံ"))
@@ -427,6 +527,25 @@ class HomeActivity : AppCompatActivity() {
         noteV.textSize = 11f
         noteV.setPadding(0, dp(6), 0, 0)
         c4.addView(noteV)
+
+        c4.addView(sectionTitle("အသံအရှိန် - SPEED"))
+        val spGroup = ChipGroup(this)
+        spGroup.isSingleSelection = true
+        spGroup.isSelectionRequired = true
+        val speedLabels = listOf("နှေးနှေး", "သာမန်", "မြန်မြန်")
+        val speedVals = listOf("0.85", "1.0", "1.2")
+        speedLabels.forEachIndexed { i, s ->
+            val ch = chipOf(s)
+            ch.id = 6000 + i
+            ch.setOnCheckedChangeListener { _, checked ->
+                if (checked) Prefs.save(this, Prefs.KEY_SPEED, speedVals[i])
+            }
+            spGroup.addView(ch)
+        }
+        val curSpeedVal = Prefs.speed(this)
+        val spIdx = speedVals.indexOf(curSpeedVal.toString())
+        spGroup.check(if (spIdx >= 0) 6000 + spIdx else 6001)
+        c4.addView(spGroup)
 
         val previewBtn = Button(this)
         previewBtn.text = "🔊 အသံစမ်းကြည့်မည် (PREVIEW)"
@@ -508,6 +627,7 @@ class HomeActivity : AppCompatActivity() {
                 start.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
             }
             Prefs.save(this, Prefs.KEY_VOICE, selectedVoice())
+            Prefs.save(this, Prefs.KEY_CUSTOM_STYLE, customStyleInput.text.toString().trim())
             Prefs.saveInt(this, Prefs.KEY_MINUTES, selectedMinutes())
             val i = Intent(this, ProcessingActivity::class.java)
             i.putExtra("api_key", key)
@@ -547,7 +667,7 @@ class HomeActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val (pcm, rate) = withContext(Dispatchers.IO) {
-                    GeminiClient.generateTts(key, "GIkoko One Recap မှ ကြိုဆိုပါတယ်။ ဒီက သင်ရွေးထားတဲ့ အသံပါ။", v)
+                    GeminiClient.generateTts(key, "GIkoko One Recap မှ ကြိုဆိုပါတယ်။ ဒီက သင်ရွေးထားတဲ့ အသံပါ။", v, Prefs.speed(this))
                 }
                 val wav = WavUtil.pcmToWav(pcm, rate)
                 val f = File(cacheDir, "voice_preview.wav")

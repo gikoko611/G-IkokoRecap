@@ -26,6 +26,7 @@ class ResultActivity : AppCompatActivity() {
     private lateinit var videoFile: File
     private var srtFile: File? = null
     private var summaryText: String = ""
+    private var thumbFile: File? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,6 +36,7 @@ class ResultActivity : AppCompatActivity() {
         val sPath = intent.getStringExtra("srt") ?: ""
         val title = intent.getStringExtra("title") ?: "Recap"
         summaryText = intent.getStringExtra("summary") ?: ""
+        val tPath = intent.getStringExtra("thumb") ?: ""
         if (vPath.isEmpty() || !File(vPath).exists()) {
             Toast.makeText(this, "Video မတွေ့ပါ", Toast.LENGTH_LONG).show()
             finish()
@@ -42,6 +44,7 @@ class ResultActivity : AppCompatActivity() {
         }
         videoFile = File(vPath)
         srtFile = if (sPath.isNotEmpty() && File(sPath).exists()) File(sPath) else null
+        thumbFile = if (tPath.isNotEmpty() && File(tPath).exists()) File(tPath) else null
 
         val head = TextView(this)
         head.text = title
@@ -110,6 +113,26 @@ class ResultActivity : AppCompatActivity() {
                 row2.addView(shTxt, btnParams())
                 shTxt.setOnClickListener { shareText() }
             }
+        }
+
+        val row3 = LinearLayout(this)
+        row3.orientation = LinearLayout.HORIZONTAL
+        val rp3 = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        rp3.setMargins(dp(12), dp(4), dp(12), dp(16))
+        root.addView(row3, rp3)
+        val tk = btn("TikTok", R.drawable.bg_chip_selected, "#F2F5FF")
+        val fb = btn("Facebook", R.drawable.bg_chip_selected, "#F2F5FF")
+        val ms = btn("Messenger", R.drawable.bg_chip_selected, "#F2F5FF")
+        row3.addView(tk, btnParams())
+        row3.addView(fb, btnParams())
+        row3.addView(ms, btnParams())
+        tk.setOnClickListener { shareToApp("com.zhiliaoapp.musically") }
+        fb.setOnClickListener { shareToApp("com.facebook.katana") }
+        ms.setOnClickListener { shareToApp("com.facebook.orca") }
+        if (thumbFile != null) {
+            val th = btn("Thumbnail", R.drawable.bg_mode_card, "#C9D2EC")
+            row3.addView(th, btnParams())
+            th.setOnClickListener { shareThumb() }
         }
 
         save.setOnClickListener { saveRecap() }
@@ -181,6 +204,36 @@ class ResultActivity : AppCompatActivity() {
         send.putExtra(Intent.EXTRA_SUBJECT, "GIkoko One Recap")
         send.putExtra(Intent.EXTRA_TEXT, summaryText)
         startActivity(Intent.createChooser(send, "Recap စာသား မျှဝေမည်"))
+    }
+
+    private fun shareToApp(pkg: String) {
+        try {
+            val uri = FileProvider.getUriForFile(this, packageName + ".fileprovider", videoFile)
+            val send = Intent(Intent.ACTION_SEND)
+            send.type = "video/mp4"
+            send.putExtra(Intent.EXTRA_STREAM, uri)
+            send.putExtra(Intent.EXTRA_TEXT, "GIkoko One Recap (AI)")
+            send.setPackage(pkg)
+            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivity(send)
+        } catch (e: Exception) {
+            Toast.makeText(this, "App မတွေ့ပါ - share chooser ပွင့်မည်", Toast.LENGTH_SHORT).show()
+            shareRecap()
+        }
+    }
+
+    private fun shareThumb() {
+        val t = thumbFile ?: return
+        try {
+            val uri = FileProvider.getUriForFile(this, packageName + ".fileprovider", t)
+            val send = Intent(Intent.ACTION_SEND)
+            send.type = "image/jpeg"
+            send.putExtra(Intent.EXTRA_STREAM, uri)
+            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivity(Intent.createChooser(send, "Thumbnail မျှဝေမည်"))
+        } catch (e: Exception) {
+            Toast.makeText(this, "Share failed: " + (e.message ?: ""), Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onStart() {

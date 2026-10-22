@@ -50,6 +50,7 @@ class ProcessingActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_processing)
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         startAt = SystemClock.elapsedRealtime()
         val root = findViewById<LinearLayout>(R.id.rootContainer)
         stepText = TextView(this)
@@ -106,7 +107,11 @@ class ProcessingActivity : AppCompatActivity() {
             Prefs.segFull(this),
             Prefs.watermark(this),
             Prefs.introOutro(this),
-            Prefs.quality(this)
+            Prefs.quality(this),
+            Prefs.style(this),
+            Prefs.speed(this),
+            Prefs.customStyle(this),
+            Prefs.vertical(this)
         )
         val source = intent.getStringExtra("source") ?: "youtube"
         val url = intent.getStringExtra("url") ?: ""
@@ -151,6 +156,17 @@ class ProcessingActivity : AppCompatActivity() {
                     meta.put("source", srcName)
                     meta.put("summary", out.summary)
                     File(dir, "meta.json").writeText(meta.toString())
+                    val thumb = File(dir, "thumb.jpg")
+                    runCatching {
+                        val mmr = android.media.MediaMetadataRetriever()
+                        mmr.setDataSource(v.absolutePath)
+                        val bm = mmr.getFrameAtTime(1000000L, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                        if (bm != null) {
+                            thumb.outputStream().use { bm.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, it) }
+                            bm.recycle()
+                        }
+                        mmr.release()
+                    }
                     v
                 }
                 addLog("Archive saved - " + archiveVideo.name)
@@ -167,6 +183,7 @@ class ProcessingActivity : AppCompatActivity() {
                 i.putExtra("srt", out.srt.absolutePath)
                 i.putExtra("title", out.title)
                 i.putExtra("summary", out.summary)
+                i.putExtra("thumb", File(archiveVideo.parentFile, "thumb.jpg").absolutePath)
                 startActivity(i)
                 finish()
             } catch (e: Exception) {

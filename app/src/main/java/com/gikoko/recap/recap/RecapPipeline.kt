@@ -43,7 +43,11 @@ data class RecapConfig(
     val fullSegments: Boolean,
     val watermark: Boolean,
     val introOutro: Boolean,
-    val quality: Int
+    val quality: Int,
+    val style: String,
+    val speed: Double,
+    val customStyle: String,
+    val vertical: Boolean
 )
 
 data class RecapOutput(val video: File, val srt: File, val title: String, val summary: String)
@@ -60,6 +64,7 @@ object RecapPipeline {
     ): RecapOutput {
         val cache = File(context.cacheDir, "recap_work")
         cache.mkdirs()
+        onLog("Recap style: " + cfg.style + "  speed=" + cfg.speed + "  vertical=" + cfg.vertical)
         val prep = withContext(Dispatchers.IO) {
             val plan: RecapPlan
             if (cfg.provider == "custom") {
@@ -70,7 +75,7 @@ object RecapPipeline {
                 onLog("Encoding file " + String.format("%.1f", mb) + " MB")
                 onProgress(18)
                 val b64 = android.util.Base64.encodeToString(srcFile.readBytes(), android.util.Base64.NO_WRAP)
-                plan = GeminiClient.generatePlanCustom(cfg.baseUrl, cfg.customKey, cfg.customModel, "data:video/mp4;base64," + b64, true, cfg.targetMinutes, cfg.lang, cfg.fullSegments, onLog)
+                plan = GeminiClient.generatePlanCustom(cfg.baseUrl, cfg.customKey, cfg.customModel, "data:video/mp4;base64," + b64, true, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
                 onProgress(45)
             } else {
                 onStep("Video ကို Gemini ဆီ တင်နေသည်...")
@@ -83,7 +88,7 @@ object RecapPipeline {
                 onProgress(12)
                 onStep("AI နဲ့ ခြုံငုံသုံးသပ်နေသည်...")
                 onProgress(18)
-                plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, ready, cfg.targetMinutes, cfg.lang, cfg.fullSegments, onLog)
+                plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, ready, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
                 onProgress(45)
             }
             onStep("အသံထုတ်နေသည်...")
@@ -95,6 +100,29 @@ object RecapPipeline {
 
         onStep("Recap video ဖွဲ့စည်းနေသည်...")
         onProgress(68)
+        var cropL = 0f
+        var cropR = 0f
+        var cropT = 0f
+        var cropB = 0f
+        if (cfg.vertical) {
+            runCatching {
+                val mmr = android.media.MediaMetadataRetriever()
+                mmr.setDataSource(srcFile.absolutePath)
+                val vw = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 1280
+                val vh = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 720
+                mmr.release()
+                val target = 9.0 / 16.0
+                if (vw.toDouble() / vh.toDouble() > target) {
+                    val c = ((1.0 - (vh * target) / vw) / 2.0).toFloat()
+                    cropL = c
+                    cropR = c
+                } else {
+                    val c = ((1.0 - (vw / target) / vh) / 2.0).toFloat()
+                    cropT = c
+                    cropB = c
+                }
+            }
+        }
         val videoItems = ArrayList<EditedMediaItem>()
         for (i in plan.segments.indices) {
             val seg = plan.segments[i]
@@ -113,7 +141,12 @@ object RecapPipeline {
                 val texList: ImmutableList<TextureOverlay> = ImmutableList.of(overlay)
                 videoEffects.add(OverlayEffect(texList))
             }
-            videoEffects.add(Presentation.createForHeight(if (cfg.quality == 0) 720 else 1080))
+            if (cfg.vertical) {
+                videoEffects.add(androidx.media3.effect.Crop(cropL, cropR, cropT, cropB))
+                videoEffects.add(Presentation.createForWidth(1080))
+            } else {
+                videoEffects.add(Presentation.createForHeight(if (cfg.quality == 0) 720 else 1080))
+            }
             val effectList: List<Effect> = ImmutableList.copyOf(videoEffects)
             b.setEffects(Effects(ImmutableList.of(), effectList))
             videoItems.add(b.build())
@@ -133,7 +166,9 @@ object RecapPipeline {
         withContext(Dispatchers.IO) {
             srt.writeText(buildSrt(plan.segments, wavs, 0))
         }
-        val summary = plan.segments.joinToString(" ") { s -> s.text }
+        var summary = plan.segments.joinToString(" ") { s -> s.text }
+        if (plan.chapters.isNotEmpty()) summary += "\n\nCHAPTERS\n" + plan.chapters.joinToString("\n")
+        if (plan.quiz.isNotEmpty()) summary += "\n\nQUIZ\n" + plan.quiz.joinToString("\n")
         return RecapOutput(out, srt, plan.title, summary)
     }
 
@@ -147,14 +182,15 @@ object RecapPipeline {
     ): RecapOutput {
         val cache = File(context.cacheDir, "recap_work")
         cache.mkdirs()
+        onLog("Recap style: " + cfg.style + "  speed=" + cfg.speed + "  vertical=" + cfg.vertical)
         val prep = withContext(Dispatchers.IO) {
             onStep("Gemini နဲ့ Video ခြုံငုံနေသည်...")
             onProgress(18)
             val plan: RecapPlan
             if (cfg.provider == "custom") {
-                plan = GeminiClient.generatePlanCustom(cfg.baseUrl, cfg.customKey, cfg.customModel, url, false, cfg.targetMinutes, cfg.lang, cfg.fullSegments, onLog)
+                plan = GeminiClient.generatePlanCustom(cfg.baseUrl, cfg.customKey, cfg.customModel, url, false, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
             } else {
-                plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, url, cfg.targetMinutes, cfg.lang, cfg.fullSegments, onLog)
+                plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, url, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
             }
             onProgress(45)
             onStep("အသံထုတ်နေသည်...")
@@ -169,12 +205,12 @@ object RecapPipeline {
         withContext(Dispatchers.IO) {
             for (i in plan.segments.indices) {
                 val f = File(cache, "frame_" + i + ".jpg")
-                FrameRenderer.render(plan.title, plan.segments[i].text, i, f, cfg.watermark)
+                FrameRenderer.render(plan.title, plan.segments[i].text, i, f, cfg.watermark, cfg.vertical)
                 onProgress(66 + 6 * (i + 1) / nSeg)
             }
             if (cfg.introOutro) {
-                FrameRenderer.renderBranded(File(cache, "intro.jpg"), true, cfg.watermark)
-                FrameRenderer.renderBranded(File(cache, "outro.jpg"), false, cfg.watermark)
+                FrameRenderer.renderBranded(File(cache, "intro.jpg"), true, cfg.watermark, cfg.vertical)
+                FrameRenderer.renderBranded(File(cache, "outro.jpg"), false, cfg.watermark, cfg.vertical)
             }
         }
         onStep("Recap video ဖွဲ့စည်းနေသည်...")
@@ -205,7 +241,9 @@ object RecapPipeline {
         withContext(Dispatchers.IO) {
             srt.writeText(buildSrt(plan.segments, wavs, if (cfg.introOutro) 2500 else 0))
         }
-        val summary = plan.segments.joinToString(" ") { s -> s.text }
+        var summary = plan.segments.joinToString(" ") { s -> s.text }
+        if (plan.chapters.isNotEmpty()) summary += "\n\nCHAPTERS\n" + plan.chapters.joinToString("\n")
+        if (plan.quiz.isNotEmpty()) summary += "\n\nQUIZ\n" + plan.quiz.joinToString("\n")
         return RecapOutput(out, srt, plan.title, summary)
     }
 
@@ -229,7 +267,7 @@ object RecapPipeline {
         val list = ArrayList<File>()
         for (i in segs.indices) {
             onLog("TTS segment " + (i + 1) + "/" + segs.size + " voice=" + cfg.voice)
-            val (pcm, rate) = GeminiClient.generateTts(cfg.apiKey, segs[i].text, cfg.voice)
+            val (pcm, rate) = GeminiClient.generateTts(cfg.apiKey, segs[i].text, cfg.voice, cfg.speed)
             val wav = WavUtil.pcmToWav(pcm, rate)
             val f = File(cache, "seg_" + i + ".wav")
             f.writeBytes(wav)
