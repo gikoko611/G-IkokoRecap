@@ -3,7 +3,7 @@ package com.gikoko.recap
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
-import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
@@ -23,8 +23,8 @@ import java.io.File
 
 class SettingsActivity : AppCompatActivity() {
 
-    private val voices = listOf("Puck", "Charon", "Fenrir", "Orus", "Algenib", "Rasalgethi", "Kore", "Leda", "Aoede", "Despina", "Sulafet", "Zephyr")
-    private val models = listOf("gemini-2.5-flash", "gemini-2.0-flash")
+    private val voices = listOf("Sulafat", "Vindemiatrix", "Erinome", "Aoede", "Kore", "Leda", "Zephyr", "Despina", "Charon", "Iapetus", "Achird", "Orus", "Puck", "Fenrir", "Algenib", "Rasalgethi")
+    private val models = listOf("gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.8-flash-lite")
     private val lengths = listOf("Auto", "1 min", "3 min", "5 min")
     private val minutesOf = intArrayOf(0, 1, 3, 5)
     private val langs = listOf("မြန်မာ", "English")
@@ -32,6 +32,12 @@ class SettingsActivity : AppCompatActivity() {
 
     private lateinit var apiInput: EditText
     private lateinit var cacheText: TextView
+    private lateinit var baseUrlInput: EditText
+    private lateinit var customKeyInput: EditText
+    private lateinit var customModelsGroup: ChipGroup
+    private lateinit var modelStatus: TextView
+    private lateinit var customCard: LinearLayout
+    private val geminiModelCards = ArrayList<LinearLayout>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,6 +45,7 @@ class SettingsActivity : AppCompatActivity() {
         val root = findViewById<LinearLayout>(R.id.rootContainer)
         build(root)
         refreshCacheSize()
+        updateProviderVis()
     }
 
     private fun dp(v: Int): Int {
@@ -125,10 +132,33 @@ class SettingsActivity : AppCompatActivity() {
         return p
     }
 
+    private fun updateProviderVis() {
+        val gemini = Prefs.provider(this) != "custom"
+        for (c in geminiModelCards) c.visibility = if (gemini) View.VISIBLE else View.GONE
+        customCard.visibility = if (gemini) View.GONE else View.VISIBLE
+    }
+
+    private fun rebuildCustomModels(models: List<String>) {
+        customModelsGroup.removeAllViews()
+        val saved = Prefs.customModel(this)
+        models.forEachIndexed { i, m ->
+            val ch = chipOf(m)
+            ch.id = 50000 + i
+            ch.setOnCheckedChangeListener { _, checked ->
+                if (checked) Prefs.save(this, Prefs.KEY_CUSTOM_MODEL, m)
+            }
+            customModelsGroup.addView(ch)
+        }
+        if (models.isNotEmpty()) {
+            val idx = models.indexOf(saved)
+            customModelsGroup.check(if (idx >= 0) 50000 + idx else 50000)
+        }
+    }
+
     private fun build(root: LinearLayout) {
         val head = LinearLayout(this)
         head.orientation = LinearLayout.HORIZONTAL
-        head.gravity = Gravity.CENTER_VERTICAL
+        head.gravity = android.view.Gravity.CENTER_VERTICAL
         val hp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         hp.setMargins(dp(8), dp(16), dp(8), dp(4))
         root.addView(head, hp)
@@ -149,8 +179,35 @@ class SettingsActivity : AppCompatActivity() {
         ht.letterSpacing = 0.2f
         head.addView(ht)
 
+        val cP = card()
+        cP.addView(sectionTitle("AI PROVIDER"))
+        val pg = ChipGroup(this)
+        pg.isSingleSelection = true
+        pg.isSelectionRequired = true
+        val pLabels = listOf("Gemini API", "Custom (REST API)")
+        pLabels.forEachIndexed { i, s ->
+            val ch = chipOf(s)
+            ch.id = 40000 + i
+            ch.setOnCheckedChangeListener { _, checked ->
+                if (checked) {
+                    val v = if (i == 0) "gemini" else "custom"
+                    Prefs.save(this, Prefs.KEY_PROVIDER, v)
+                    updateProviderVis()
+                }
+            }
+            pg.addView(ch)
+        }
+        pg.check(if (Prefs.provider(this) == "custom") 40001 else 40000)
+        cP.addView(pg)
+        val noteP = TextView(this)
+        noteP.text = "Custom ကို OpenRouter၊ Groq စတဲ့ OpenAI-compatible REST provider တွေအတွက် သုံးပါ။"
+        noteP.setTextColor(Color.parseColor("#8A93B2"))
+        noteP.textSize = 11f
+        cP.addView(noteP)
+        root.addView(cP)
+
         val c1 = card()
-        c1.addView(sectionTitle("GEMINI API KEY"))
+        c1.addView(sectionTitle("GEMINI API KEY (Video + TTS အသံ)"))
         apiInput = EditText(this)
         apiInput.hint = "aistudio.google.com/apikey"
         inputStyle(apiInput)
@@ -193,7 +250,7 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
         val note1 = TextView(this)
-        note1.text = "API key ကို app ထဲမှာဘဲ သိမ်းမယ်။ Key မှားရင် 403 ဒဏ်းပေါ်မယ်။"
+        note1.text = "အသံ (TTS) ထုတ်ဖို့ ဒီ key ကို သေချာထည့်ပါ။ Key မှားရင် 403 ဒဏ်းပေါ်မယ်။ VPN လိုနိုင်။"
         note1.setTextColor(Color.parseColor("#8A93B2"))
         note1.textSize = 11f
         note1.setPadding(0, dp(8), 0, 0)
@@ -201,7 +258,7 @@ class SettingsActivity : AppCompatActivity() {
         root.addView(c1)
 
         val c2 = card()
-        c2.addView(sectionTitle("AI MODEL"))
+        c2.addView(sectionTitle("AI MODEL (GEMINI)"))
         val mg = ChipGroup(this)
         mg.isSingleSelection = true
         mg.isSelectionRequired = true
@@ -218,11 +275,12 @@ class SettingsActivity : AppCompatActivity() {
         mg.check(if (mi >= 0) 10000 + mi else 10000)
         c2.addView(mg)
         val note2 = TextView(this)
-        note2.text = "gemini-2.5-flash က ပိုမြန်ပြီး အသစ်ဆုံးပါ။"
+        note2.text = "gemini-3.8-flash က အသစ်ဆုံးနဲ့ ပိုမြန်ပါ။"
         note2.setTextColor(Color.parseColor("#8A93B2"))
         note2.textSize = 11f
         c2.addView(note2)
         root.addView(c2)
+        geminiModelCards.add(c2)
 
         val c3 = card()
         c3.addView(sectionTitle("အသံ - DEFAULT VOICE"))
@@ -241,7 +299,100 @@ class SettingsActivity : AppCompatActivity() {
         val vi = voices.indexOf(curVoice)
         vg.check(if (vi >= 0) 11000 + vi else 11000)
         c3.addView(vg)
+        val note3 = TextView(this)
+        note3.text = "Sulafat (warm female) က မြန်မာ narration နဲ့ အနီးစပ်ဆုံး - default ပါ။ Vindemiatrix (gentle) ကလည်း သင့်တော်ပါတယ်။"
+        note3.setTextColor(Color.parseColor("#8A93B2"))
+        note3.textSize = 11f
+        c3.addView(note3)
         root.addView(c3)
+
+        customCard = card()
+        customCard.addView(sectionTitle("CUSTOM PROVIDER (REST API)"))
+        baseUrlInput = EditText(this)
+        baseUrlInput.hint = "https://openrouter.ai/api/v1"
+        inputStyle(baseUrlInput)
+        val savedBase = Prefs.baseUrl(this)
+        if (savedBase.isNotEmpty()) baseUrlInput.setText(savedBase)
+        customCard.addView(baseUrlInput)
+        customKeyInput = EditText(this)
+        customKeyInput.hint = "Provider API key (openrouter.ai/keys)"
+        inputStyle(customKeyInput)
+        val savedCk = Prefs.customKey(this)
+        if (savedCk.isNotEmpty()) customKeyInput.setText(savedCk)
+        val cpad = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        cpad.topMargin = dp(10)
+        customCard.addView(customKeyInput, cpad)
+        val rowC = LinearLayout(this)
+        rowC.orientation = LinearLayout.HORIZONTAL
+        val rpC = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        rpC.topMargin = dp(10)
+        customCard.addView(rowC, rpC)
+        val saveC = flatBtn("SAVE", R.drawable.bg_gold_btn, "#0A0A00")
+        val testC = flatBtn("TEST KEY", R.drawable.bg_chip_selected, "#F2F5FF")
+        rowC.addView(saveC, btnParams())
+        rowC.addView(testC, btnParams())
+        saveC.setOnClickListener {
+            Prefs.save(this, Prefs.KEY_BASE_URL, baseUrlInput.text.toString().trim())
+            Prefs.save(this, Prefs.KEY_CUSTOM_KEY, customKeyInput.text.toString().trim())
+            Toast.makeText(this, "သိမ်းပြီးပါပြီ", Toast.LENGTH_SHORT).show()
+        }
+        testC.setOnClickListener {
+            val b = baseUrlInput.text.toString().trim()
+            val k = customKeyInput.text.toString().trim()
+            if (b.isEmpty() || k.isEmpty()) {
+                Toast.makeText(this, "Base URL နဲ့ Key ထည့်ပေးပါ", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+            Prefs.save(this, Prefs.KEY_BASE_URL, b)
+            Prefs.save(this, Prefs.KEY_CUSTOM_KEY, k)
+            Toast.makeText(this, "စစ်ဆေးနေသည်...", Toast.LENGTH_SHORT).show()
+            lifecycleScope.launch {
+                try {
+                    val r = withContext(Dispatchers.IO) { GeminiClient.testKeyCustom(b, k) }
+                    Toast.makeText(this@SettingsActivity, "Key မှန်ပါတယ် - " + r, Toast.LENGTH_LONG).show()
+                } catch (e: Exception) {
+                    Toast.makeText(this@SettingsActivity, "မမှန်ပါ: " + (e.message ?: ""), Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+
+        customCard.addView(sectionTitle("FREE MODELS"))
+        modelStatus = TextView(this)
+        modelStatus.text = "REFRESH နှိပ်ပြီး provider ရဲ့ free model တွေ ရယူပါ"
+        modelStatus.setTextColor(Color.parseColor("#8A93B2"))
+        modelStatus.textSize = 11f
+        customCard.addView(modelStatus)
+        customModelsGroup = ChipGroup(this)
+        customModelsGroup.isSingleSelection = true
+        customModelsGroup.isSelectionRequired = true
+        customCard.addView(customModelsGroup)
+        val refreshC = flatBtn("REFRESH - FREE MODELS", R.drawable.bg_mode_card, "#C9D2EC")
+        val rpR = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        rpR.topMargin = dp(10)
+        customCard.addView(refreshC, rpR)
+        refreshC.setOnClickListener {
+            val b = baseUrlInput.text.toString().trim()
+            val k = customKeyInput.text.toString().trim()
+            if (b.isEmpty() || k.isEmpty()) {
+                Toast.makeText(this, "Base URL နဲ့ Key ထည့်ပေးပါ", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+            Prefs.save(this, Prefs.KEY_BASE_URL, b)
+            Prefs.save(this, Prefs.KEY_CUSTOM_KEY, k)
+            modelStatus.text = "Free model တွေ ရှာနေသည်..."
+            lifecycleScope.launch {
+                try {
+                    val models = withContext(Dispatchers.IO) { GeminiClient.listCustomModels(b, k) }
+                    runOnUiThread {
+                        rebuildCustomModels(models)
+                        modelStatus.text = "Free model " + models.size + " ခု တွေ့ပါတယ် - video input ပါတဲ့ model (ဥပမာ gemma-4) ရွေးပါ"
+                    }
+                } catch (e: Exception) {
+                    runOnUiThread { modelStatus.text = "မရနိုင်: " + (e.message ?: "") }
+                }
+            }
+        }
+        root.addView(customCard)
 
         val c4 = card()
         c4.addView(sectionTitle("RECAP အချိန် - DEFAULT"))
@@ -345,23 +496,17 @@ class SettingsActivity : AppCompatActivity() {
         val c8 = card()
         c8.addView(sectionTitle("ABOUT"))
         val ab1 = TextView(this)
-        ab1.text = "GIkoko One Recap v2.0 (Pro)"
+        ab1.text = "GIkoko One Recap v2.1 (Pro)"
         ab1.setTextColor(Color.parseColor("#FFC940"))
         ab1.textSize = 15f
         ab1.setTypeface(null, Typeface.BOLD)
         c8.addView(ab1)
         val ab2 = TextView(this)
-        ab2.text = "Powered by Gemini AI - Developed by I Ko Ko"
+        ab2.text = "Gemini 3.8 Flash + Custom REST provider + Free models. Developed by I Ko Ko"
         ab2.setTextColor(Color.parseColor("#8A93B2"))
         ab2.textSize = 12f
         ab2.setPadding(0, dp(6), 0, 0)
         c8.addView(ab2)
-        val ab3 = TextView(this)
-        ab3.text = "YouTube link နဲ့ file upload နှစ်မျိုးလုံ့ အဆင့်သင့်။ မြန်မာ AI အသံ + စာတန်းထိုး။"
-        ab3.setTextColor(Color.parseColor("#5A6480"))
-        ab3.textSize = 11f
-        ab3.setPadding(0, dp(6), 0, 0)
-        c8.addView(ab3)
         root.addView(c8)
 
         val pad = TextView(this)

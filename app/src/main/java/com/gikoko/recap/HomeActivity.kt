@@ -12,7 +12,6 @@ import android.os.Bundle
 import android.provider.OpenableColumns
 import android.view.Gravity
 import android.view.View
-import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
@@ -36,7 +35,7 @@ import java.io.File
 
 class HomeActivity : AppCompatActivity() {
 
-    private val voices = listOf("Puck", "Charon", "Fenrir", "Orus", "Algenib", "Rasalgethi", "Kore", "Leda", "Aoede", "Despina", "Sulafet", "Zephyr")
+    private val voices = listOf("Sulafat", "Vindemiatrix", "Erinome", "Aoede", "Kore", "Leda", "Zephyr", "Despina", "Charon", "Iapetus", "Achird", "Orus", "Puck", "Fenrir", "Algenib", "Rasalgethi")
     private val lengths = listOf("Auto", "1 min", "3 min", "5 min")
     private val minutesOf = intArrayOf(0, 1, 3, 5)
 
@@ -189,13 +188,13 @@ class HomeActivity : AppCompatActivity() {
             drawer.closeDrawer(Gravity.START)
             AlertDialog.Builder(this)
                 .setTitle("GIkoko One Recap")
-                .setMessage("Version 2.0 (Pro)\n\nAI video recap - Myanmar voice + captions.\nPowered by Gemini. Developed by I Ko Ko.")
+                .setMessage("Version 2.1 (Pro)\n\nAI video recap - Myanmar voice + captions.\nGemini 3.8 Flash + Custom REST provider.\nDeveloped by I Ko Ko.")
                 .setPositiveButton("OK", null)
                 .show()
         })
 
         val foot = TextView(this)
-        foot.text = "v2.0 Pro"
+        foot.text = "v2.1 Pro"
         foot.textSize = 11f
         foot.setTextColor(Color.parseColor("#5A6480"))
         val fp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
@@ -206,16 +205,17 @@ class HomeActivity : AppCompatActivity() {
     private fun refreshStatus() {
         statusCard.removeAllViews()
         val key = Prefs.apiKey(this)
+        val provider = Prefs.provider(this)
         if (key.isEmpty()) {
             val warn = TextView(this)
-            warn.text = "API key မထည့်ရသေးပါ"
+            warn.text = "Gemini API key မထည့်ရသေးပါ"
             warn.setTextColor(Color.parseColor("#FFC940"))
             warn.textSize = 15f
             warn.setTypeface(null, Typeface.BOLD)
             statusCard.addView(warn)
 
             val note = TextView(this)
-            note.text = "Recap လုပ်ဖို့ Gemini API key လိုပါတယ်။ Settings မှာ ထည့်ပေးပါ။"
+            note.text = "အသံ (TTS) ထုတ်ဖို့ Gemini key လိုပါတယ်။ Settings မှာ ထည့်ပေးပါ။"
             note.setTextColor(Color.parseColor("#8A93B2"))
             note.textSize = 12f
             note.setPadding(0, dp(6), 0, dp(10))
@@ -231,9 +231,25 @@ class HomeActivity : AppCompatActivity() {
             go.setPadding(dp(8), dp(12), dp(8), dp(12))
             go.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
             statusCard.addView(go)
+        } else if (provider == "custom") {
+            val ok = TextView(this)
+            ok.text = "CUSTOM PROVIDER ✓ သင့်နေပါပြီ"
+            ok.setTextColor(Color.parseColor("#3DE8F8"))
+            ok.textSize = 15f
+            ok.setTypeface(null, Typeface.BOLD)
+            statusCard.addView(ok)
+
+            val info = TextView(this)
+            info.text = "Free model: " + Prefs.customModel(this) + "  \u2022  အသံ (TTS): Gemini key ✓"
+            info.setTextColor(Color.parseColor("#8A93B2"))
+            info.textSize = 11f
+            info.setPadding(0, dp(6), 0, 0)
+            statusCard.addView(info)
+
+            statusCard.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
         } else {
             val ok = TextView(this)
-            ok.text = "API KEY ✓ သင့်နေပါပြီ"
+            ok.text = "GEMINI API ✓ သင့်နေပါပြီ"
             ok.setTextColor(Color.parseColor("#3DE8F8"))
             ok.textSize = 15f
             ok.setTypeface(null, Typeface.BOLD)
@@ -383,6 +399,13 @@ class HomeActivity : AppCompatActivity() {
         voiceGroup.check(if (vi >= 0) 2000 + vi else 2000)
         c4.addView(voiceGroup)
 
+        val noteV = TextView(this)
+        noteV.text = "Sulafat က မြန်မာအသံနဲ့ အနီးစပ်ဆုံး - default ပါ"
+        noteV.setTextColor(Color.parseColor("#8A93B2"))
+        noteV.textSize = 11f
+        noteV.setPadding(0, dp(6), 0, 0)
+        c4.addView(noteV)
+
         val previewBtn = Button(this)
         previewBtn.text = "🔊 အသံစမ်းကြည့်မည် (PREVIEW)"
         previewBtn.isAllCaps = false
@@ -437,7 +460,7 @@ class HomeActivity : AppCompatActivity() {
         beat.start()
 
         val ver = TextView(this)
-        ver.text = "GIkoko One Recap v2.0 Pro \u2022 powered by Gemini"
+        ver.text = "GIkoko One Recap v2.1 Pro \u2022 powered by Gemini 3.8"
         ver.gravity = Gravity.CENTER
         ver.setTextColor(Color.parseColor("#5A6480"))
         ver.textSize = 11f
@@ -448,9 +471,16 @@ class HomeActivity : AppCompatActivity() {
         start.setOnClickListener {
             val key = Prefs.apiKey(this)
             if (key.isEmpty()) {
-                Toast.makeText(this, "Settings မှာ Gemini API key ထည့်ပေးပါ", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "အသံ (TTS) အတွက် Gemini API key လိုပါတယ် - Settings မှာ ထည့်ပါ", Toast.LENGTH_LONG).show()
                 startActivity(Intent(this, SettingsActivity::class.java))
                 return@setOnClickListener
+            }
+            if (Prefs.provider(this) == "custom") {
+                if (Prefs.baseUrl(this).isEmpty() || Prefs.customKey(this).isEmpty() || Prefs.customModel(this).isEmpty()) {
+                    Toast.makeText(this, "Settings မှာ Custom provider (Base URL / Key / Free model) ဖြည့်ပါ", Toast.LENGTH_LONG).show()
+                    startActivity(Intent(this, SettingsActivity::class.java))
+                    return@setOnClickListener
+                }
             }
             if (Prefs.haptic(this)) {
                 start.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
@@ -487,7 +517,7 @@ class HomeActivity : AppCompatActivity() {
     private fun previewVoice() {
         val key = Prefs.apiKey(this)
         if (key.isEmpty()) {
-            Toast.makeText(this, "Settings မှာ API key ထည့်ပေးပါ", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Settings မှာ Gemini API key ထည့်ပေးပါ", Toast.LENGTH_LONG).show()
             return
         }
         val v = selectedVoice()
