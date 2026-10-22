@@ -24,6 +24,7 @@ import com.gikoko.recap.net.GeminiClient
 import com.gikoko.recap.net.RecapPlan
 import com.gikoko.recap.net.Segment
 import com.gikoko.recap.net.TranscriptClient
+import com.gikoko.recap.net.Tts
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -431,7 +432,8 @@ object RecapPipeline {
         for (i in segs.indices) {
             val voice = if (cfg.dialogue && i % 2 == 1) cfg.voice2 else cfg.voice
             onLog("TTS segment " + (i + 1) + "/" + segs.size + " voice=" + voice)
-            val (pcm, rate) = GeminiClient.generateTts(cfg.apiKey, segs[i].text, voice, cfg.speed)
+            val ev = if (cfg.dialogue && i % 2 == 1) Tts.secondEdgeVoice(context) else Tts.defaultEdgeVoice(context)
+            val (pcm, rate) = Tts.generate(context, cfg.apiKey, segs[i].text, voice, cfg.speed, ev)
             val wav = WavUtil.pcmToWav(pcm, rate)
             val f = File(cache, "seg_" + i + ".wav")
             f.writeBytes(wav)

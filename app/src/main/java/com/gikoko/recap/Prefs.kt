@@ -54,6 +54,8 @@ object Prefs {
     const val KEY_CLONE_VOICE = "clone_voice"
     const val KEY_CLONE_STYLE = "clone_style"
     const val KEY_PODCAST = "podcast_export"
+    const val KEY_TTS_ENGINE = "tts_engine"
+    const val KEY_EDGE_VOICE = "edge_voice"
 
     private val validModels = setOf("gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.8-flash-lite")
     private val validVoices = setOf("Sulafat", "Vindemiatrix", "Erinome", "Aoede", "Kore", "Leda", "Zephyr", "Despina", "Charon", "Iapetus", "Achird", "Orus", "Puck", "Fenrir", "Algenib", "Rasalgethi")
@@ -117,6 +119,8 @@ object Prefs {
     }
 
     fun customModel(ctx: Context): String = str(ctx, KEY_CUSTOM_MODEL, "")
+    fun ttsEngine(ctx: Context): String = str(ctx, KEY_TTS_ENGINE, "gemini")
+    fun edgeVoice(ctx: Context): String = str(ctx, KEY_EDGE_VOICE, "my-MM-NilarNeural")
     fun minutes(ctx: Context): Int = int(ctx, KEY_MINUTES, 0)
 
     fun speed(ctx: Context): Double {
