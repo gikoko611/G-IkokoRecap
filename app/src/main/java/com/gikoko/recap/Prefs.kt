@@ -23,6 +23,7 @@ object Prefs {
     const val KEY_CUSTOM_MODEL = "custom_model"
     const val KEY_STYLE = "recap_style"
     const val KEY_SPEED = "recap_speed"
+    const val KEY_VERTICAL = "recap_vertical"
     const val KEY_CUSTOM_STYLE = "custom_style"
 
     private val validModels = setOf("gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.8-flash-lite")
@@ -99,6 +100,8 @@ object Prefs {
     }
 
     fun customStyle(ctx: Context): String = str(ctx, KEY_CUSTOM_STYLE, "")
+
+    fun vertical(ctx: Context): Boolean = str(ctx, KEY_VERTICAL, "0") == "1"
     fun captions(ctx: Context): Boolean = bool(ctx, KEY_CAPTIONS, true)
     fun lang(ctx: Context): String = str(ctx, KEY_LANG, "my")
     fun quality(ctx: Context): Int = int(ctx, KEY_QUALITY, 1)

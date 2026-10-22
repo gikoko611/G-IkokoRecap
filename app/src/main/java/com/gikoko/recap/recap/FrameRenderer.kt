@@ -13,10 +13,9 @@ import java.io.FileOutputStream
 
 object FrameRenderer {
 
-    private const val W = 1280
-    private const val H = 720
-
-    fun render(title: String, text: String, index: Int, outFile: File, watermark: Boolean) {
+    fun render(title: String, text: String, index: Int, outFile: File, watermark: Boolean, vertical: Boolean = false) {
+        val W = if (vertical) 720 else 1280
+        val H = if (vertical) 1280 else 720
         val bmp = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         c.drawColor(Color.parseColor("#05070E"))
@@ -86,7 +85,9 @@ object FrameRenderer {
         bmp.recycle()
     }
 
-    fun renderBranded(outFile: File, intro: Boolean, watermark: Boolean) {
+    fun renderBranded(outFile: File, intro: Boolean, watermark: Boolean, vertical: Boolean = false) {
+        val W = if (vertical) 720 else 1280
+        val H = if (vertical) 1280 else 720
         val bmp = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         c.drawColor(Color.parseColor("#05070E"))

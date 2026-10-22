@@ -74,6 +74,12 @@ class HomeActivity : AppCompatActivity() {
         buildDrawer(panel)
         buildUi(root)
         maybeShowCrash()
+        val shared = intent.getStringExtra(Intent.EXTRA_TEXT)
+        if (!shared.isNullOrBlank() && (shared.contains("youtube.com") || shared.contains("youtu.be"))) {
+            linkInput.setText(shared.trim())
+            setMode("youtube")
+            Toast.makeText(this, "YouTube link ရပါပြီ - START နှိပ်ပါ", Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onResume() {
@@ -240,7 +246,7 @@ class HomeActivity : AppCompatActivity() {
         panel.addView(followNote)
 
         val foot = TextView(this)
-        foot.text = "v2.1.1 Pro"
+        foot.text = "v0.0.1 Pro"
         foot.textSize = 11f
         foot.setTextColor(Color.parseColor("#5A6480"))
         val fp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
@@ -449,6 +455,22 @@ class HomeActivity : AppCompatActivity() {
         segsFull = Prefs.segFull(this)
         sg.check(if (segsFull) 3101 else 3100)
         c3.addView(sg)
+
+        c3.addView(sectionTitle("FORMAT"))
+        val fmtGroup = ChipGroup(this)
+        fmtGroup.isSingleSelection = true
+        fmtGroup.isSelectionRequired = true
+        val fmtLabels = listOf("16:9 Landscape", "9:16 Shorts")
+        fmtLabels.forEachIndexed { i, s ->
+            val ch = chipOf(s)
+            ch.id = 7000 + i
+            ch.setOnCheckedChangeListener { _, checked ->
+                if (checked) Prefs.save(this, Prefs.KEY_VERTICAL, if (i == 1) "1" else "0")
+            }
+            fmtGroup.addView(ch)
+        }
+        fmtGroup.check(if (Prefs.vertical(this)) 7001 else 7000)
+        c3.addView(fmtGroup)
         root.addView(c3)
 
         val cStyle = card()

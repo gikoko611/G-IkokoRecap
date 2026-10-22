@@ -13,7 +13,7 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 data class Segment(val startSec: Int, val endSec: Int, val text: String)
-data class RecapPlan(val title: String, val segments: List<Segment>)
+data class RecapPlan(val title: String, val segments: List<Segment>, val chapters: List<String> = emptyList(), val quiz: List<String> = emptyList())
 
 object GeminiClient {
 
@@ -218,9 +218,9 @@ object GeminiClient {
                 "Pick the most important moments of the video. " +
                 "Narration style: " + styleTxt + " " + customTxt +
                 "Return STRICT JSON only, in this exact shape: " +
-                "{\"title\":\"short title in English\",\"segments\":[{\"startSec\":123,\"endSec\":456,\"text\":\"English narration text\"}]} " +
+                "{\"title\":\"short title in English\",\"segments\":[{\"startSec\":123,\"endSec\":456,\"text\":\"English narration text\"}],\"chapters\":[{\"t\":\"00:12\",\"title\":\"chapter title\"}],\"quiz\":[{\"q\":\"question about the video\",\"a\":\"answer\"}]} " +
                 "Use " + segTxt + ". Each segment text must be one or two English sentences that summarize that part of the video. " +
-                "Each segment must be between 15 and 90 seconds long. No markdown, JSON only."
+                "Each segment must be between 15 and 90 seconds long. Also include a \"chapters\" array (4 to 8 entries: t = mm:ss timestamp of that moment in the original video, title = short chapter title) and a \"quiz\" array (3 to 5 question/answer pairs about the video). No markdown, JSON only."
         } else {
             "You are a video recap editor. The video is provided below. " +
                 "Create a short recap narration plan in Myanmar (Burmese) language. " +
@@ -228,9 +228,9 @@ object GeminiClient {
                 "Pick the most important moments of the video. " +
                 "Narration style: " + styleTxt + " " + customTxt +
                 "Return STRICT JSON only, in this exact shape: " +
-                "{\"title\":\"short title in Myanmar\",\"segments\":[{\"startSec\":123,\"endSec\":456,\"text\":\"Myanmar narration text\"}]} " +
+                "{\"title\":\"short title in Myanmar\",\"segments\":[{\"startSec\":123,\"endSec\":456,\"text\":\"Myanmar narration text\"}],\"chapters\":[{\"t\":\"00:12\",\"title\":\"chapter title\"}],\"quiz\":[{\"q\":\"question about the video\",\"a\":\"answer\"}]} " +
                 "Use " + segTxt + ". Each segment text must be one or two Myanmar sentences that summarize that part of the video. " +
-                "Each segment must be between 15 and 90 seconds long. No markdown, JSON only."
+                "Each segment must be between 15 and 90 seconds long. Also include a \"chapters\" array (4 to 8 entries: t = mm:ss timestamp of that moment in the original video, title = short chapter title) and a \"quiz\" array (3 to 5 question/answer pairs about the video). No markdown, JSON only."
         }
     }
 
@@ -330,7 +330,27 @@ object GeminiClient {
             if (tx.isNotBlank() && en > st) segs.add(Segment(st, en, tx))
         }
         if (segs.isEmpty()) throw IOException("AI returned no segments")
-        return RecapPlan(title, segs)
+        val chapters = ArrayList<String>()
+        val chArr = j.optJSONArray("chapters")
+        if (chArr != null) {
+            for (i in 0 until chArr.length()) {
+                val o = chArr.getJSONObject(i)
+                val t = o.optString("t", "")
+                val ti = o.optString("title", "")
+                if (t.isNotEmpty() && ti.isNotEmpty()) chapters.add(t + " — " + ti)
+            }
+        }
+        val quiz = ArrayList<String>()
+        val qArr = j.optJSONArray("quiz")
+        if (qArr != null) {
+            for (i in 0 until qArr.length()) {
+                val o = qArr.getJSONObject(i)
+                val q = o.optString("q", "")
+                val a = o.optString("a", "")
+                if (q.isNotEmpty() && a.isNotEmpty()) quiz.add("Q: " + q + "\nA: " + a)
+            }
+        }
+        return RecapPlan(title, segs, chapters, quiz)
     }
 
     fun generateTts(apiKey: String, text: String, voice: String, speakingRate: Double = 1.0): Pair<ByteArray, Int> {
