@@ -2,6 +2,7 @@ package com.gikoko.recap.net
 
 import android.util.Base64
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
@@ -351,6 +352,57 @@ object GeminiClient {
             }
             Thread.sleep(3000L * attempt)
         }
+    }
+
+    fun whisperTranscribe(baseUrl: String, apiKey: String, audio: File): String {
+        val mp = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("model", "whisper-large-v3-turbo")
+            .addFormDataPart("response_format", "text")
+            .addFormDataPart("file", audio.name, audio.asRequestBody("audio/mp4".toMediaType()))
+            .build()
+        val req = Request.Builder()
+            .url(normalizeBase(baseUrl) + "/audio/transcriptions")
+            .header("Authorization", "Bearer " + apiKey)
+            .post(mp)
+            .build()
+        client.newCall(req).execute().use { resp ->
+            val txt = resp.body?.string() ?: ""
+            if (!resp.isSuccessful) throw IOException("HTTP " + resp.code + ": " + txt.take(400))
+            if (txt.isBlank()) throw IOException("Whisper returned empty transcript")
+            return txt.trim()
+        }
+    }
+
+    fun planToJson(plan: RecapPlan, useFrames: Boolean): String {
+        val segs = JSONArray()
+        for (s in plan.segments) {
+            segs.put(JSONObject().put("start", s.startSec).put("end", s.endSec).put("text", s.text))
+        }
+        return JSONObject()
+            .put("title", plan.title)
+            .put("segments", segs)
+            .put("chapters", JSONArray(plan.chapters))
+            .put("quiz", JSONArray(plan.quiz))
+            .put("frames", useFrames)
+            .toString()
+    }
+
+    fun planFromJson(raw: String): Pair<RecapPlan, Boolean> {
+        val j = JSONObject(raw.trim())
+        val segs = ArrayList<Segment>()
+        val arr = j.optJSONArray("segments") ?: JSONArray()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            segs.add(Segment(o.optInt("start", 0), o.optInt("end", 0), o.optString("text", "")))
+        }
+        val chapters = ArrayList<String>()
+        val ch = j.optJSONArray("chapters")
+        if (ch != null) for (i in 0 until ch.length()) chapters.add(ch.optString(i))
+        val quiz = ArrayList<String>()
+        val qz = j.optJSONArray("quiz")
+        if (qz != null) for (i in 0 until qz.length()) quiz.add(qz.optString(i))
+        return Pair(RecapPlan(j.optString("title", "Video Recap"), segs, chapters, quiz), j.optBoolean("frames", true))
     }
 
     fun parsePlan(raw: String): RecapPlan {

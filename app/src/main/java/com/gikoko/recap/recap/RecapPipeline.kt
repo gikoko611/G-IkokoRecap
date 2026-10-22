@@ -18,6 +18,8 @@ import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
 import com.google.common.collect.ImmutableList
+import com.gikoko.recap.L
+import com.gikoko.recap.Prefs
 import com.gikoko.recap.net.GeminiClient
 import com.gikoko.recap.net.RecapPlan
 import com.gikoko.recap.net.Segment
@@ -53,7 +55,12 @@ data class RecapConfig(
     val extKey: String = "",
     val extModel: String = "",
     val transcriptMode: Boolean = false,
-    val transcriptFallback: Boolean = true
+    val transcriptFallback: Boolean = true,
+    val wmSize: Int = 100,
+    val wmPos: String = "tr",
+    val wmLogo: String = "",
+    val theme: String = "gold",
+    val planConfirm: Boolean = false
 )
 
 data class RecapOutput(val video: File, val srt: File, val title: String, val summary: String)
@@ -68,13 +75,51 @@ object RecapPipeline {
         onLog: (String) -> Unit,
         onProgress: (Int) -> Unit
     ): RecapOutput {
+        val (plan, useFrames) = planFromFile(context, srcFile, cfg, onStep, onLog, onProgress)
+        return renderFromFile(context, srcFile, plan, cfg, useFrames, onStep, onLog, onProgress)
+    }
+
+    suspend fun runFromYouTube(
+        context: Context,
+        url: String,
+        cfg: RecapConfig,
+        onStep: (String) -> Unit,
+        onLog: (String) -> Unit,
+        onProgress: (Int) -> Unit
+    ): RecapOutput {
+        val plan = planFromYouTube(context, url, cfg, onStep, onLog, onProgress)
+        return renderYouTube(context, plan, cfg, onStep, onLog, onProgress)
+    }
+
+    suspend fun planFromFile(
+        context: Context,
+        srcFile: File,
+        cfg: RecapConfig,
+        onStep: (String) -> Unit,
+        onLog: (String) -> Unit,
+        onProgress: (Int) -> Unit
+    ): Pair<RecapPlan, Boolean> {
         val cache = File(context.cacheDir, "recap_work")
         cache.mkdirs()
         onLog("Recap style: " + cfg.style + "  speed=" + cfg.speed + "  vertical=" + cfg.vertical)
-        val prep = withContext(Dispatchers.IO) {
+        if (cfg.transcriptMode && cfg.extKey.isNotEmpty()) {
+            onStep(L.s(context, "Audio ထုတ်နေသည်...", "Extracting audio..."))
+            onProgress(5)
+            val audio = File(cache, "audio_only.mp4")
+            withContext(Dispatchers.Main) { extractAudio(context, srcFile, audio) }
+            Prefs.bumpUsage(context, Prefs.KEY_U_ASR, 1)
+            onLog("Whisper ASR: " + cfg.extModel)
+            val t = GeminiClient.whisperTranscribe(cfg.extBase, cfg.extKey, audio)
+            onLog("Transcript ready: " + t.length + " chars - plan ဆွဲနေသည်")
+            val plan = GeminiClient.generatePlanTranscript(cfg.extBase, cfg.extKey, cfg.extModel, t, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
+            Prefs.bumpUsage(context, Prefs.KEY_U_EXT, 1)
+            onProgress(45)
+            return Pair(plan, true)
+        }
+        return withContext(Dispatchers.IO) {
             val plan: RecapPlan
             if (cfg.provider == "custom") {
-                onStep("Custom provider နဲ့ ခြုံငုံနေသည်...")
+                onStep(L.s(context, "Custom provider နဲ့ ခြုံငုံနေသည်...", "Analyzing with custom provider..."))
                 onProgress(3)
                 val mb = srcFile.length() / (1024.0 * 1024.0)
                 if (mb > 24) throw IOException("Custom provider နဲ့ Video File mode မှာ 24MB အောက်ပဲရတယ်။ YouTube mode ကို သုံးပါ။")
@@ -82,9 +127,10 @@ object RecapPipeline {
                 onProgress(18)
                 val b64 = android.util.Base64.encodeToString(srcFile.readBytes(), android.util.Base64.NO_WRAP)
                 plan = GeminiClient.generatePlanCustom(cfg.baseUrl, cfg.customKey, cfg.customModel, "data:video/mp4;base64," + b64, true, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
+                Prefs.bumpUsage(context, Prefs.KEY_U_EXT, 1)
                 onProgress(45)
             } else {
-                onStep("Video ကို Gemini ဆီ တင်နေသည်...")
+                onStep(L.s(context, "Video ကို Gemini ဆီ တင်နေသည်...", "Uploading video to Gemini..."))
                 onProgress(3)
                 val mime = GeminiClient.guessMime(srcFile.name)
                 val fileName = GeminiClient.uploadVideo(cfg.apiKey, srcFile, mime, srcFile.name)
@@ -92,19 +138,72 @@ object RecapPipeline {
                 onProgress(8)
                 val ready = GeminiClient.waitForFileReady(cfg.apiKey, fileName, onLog)
                 onProgress(12)
-                onStep("AI နဲ့ ခြုံငုံသုံးသပ်နေသည်...")
+                onStep(L.s(context, "AI နဲ့ ခြုံငုံသုံးသပ်နေသည်...", "Analyzing with AI..."))
                 onProgress(18)
                 plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, ready, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
+                Prefs.bumpUsage(context, Prefs.KEY_U_PLAN, 1)
                 onProgress(45)
             }
-            onStep("အသံထုတ်နေသည်...")
-            val w = genWavs(cache, cfg, plan.segments, onLog, onProgress, 45, 20)
-            Pair(plan, w)
+            Pair(plan, false)
         }
-        val plan = prep.first
-        val wavs = prep.second
+    }
 
-        onStep("Recap video ဖွဲ့စည်းနေသည်...")
+    suspend fun planFromYouTube(
+        context: Context,
+        url: String,
+        cfg: RecapConfig,
+        onStep: (String) -> Unit,
+        onLog: (String) -> Unit,
+        onProgress: (Int) -> Unit
+    ): RecapPlan {
+        val cache = File(context.cacheDir, "recap_work")
+        cache.mkdirs()
+        onLog("Recap style: " + cfg.style + "  speed=" + cfg.speed + "  vertical=" + cfg.vertical)
+        return withContext(Dispatchers.IO) {
+            onStep(L.s(context, "Gemini နဲ့ Video ခြုံငုံနေသည်...", "Analyzing video with Gemini..."))
+            onProgress(18)
+            val plan: RecapPlan
+            if (cfg.transcriptMode && cfg.extKey.isNotEmpty()) {
+                plan = transcriptPlan(context, cfg, url, onLog)
+            } else if (cfg.provider == "custom") {
+                plan = try {
+                    val p = GeminiClient.generatePlanCustom(cfg.baseUrl, cfg.customKey, cfg.customModel, url, false, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
+                    Prefs.bumpUsage(context, Prefs.KEY_U_EXT, 1)
+                    p
+                } catch (e: Exception) {
+                    tryTranscriptFallback(context, e, cfg, url, onLog)
+                }
+            } else {
+                plan = try {
+                    val p = GeminiClient.generatePlan(cfg.apiKey, cfg.model, url, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
+                    Prefs.bumpUsage(context, Prefs.KEY_U_PLAN, 1)
+                    p
+                } catch (e: Exception) {
+                    tryTranscriptFallback(context, e, cfg, url, onLog)
+                }
+            }
+            onProgress(45)
+            plan
+        }
+    }
+
+    suspend fun renderFromFile(
+        context: Context,
+        srcFile: File,
+        plan: RecapPlan,
+        cfg: RecapConfig,
+        useFrames: Boolean,
+        onStep: (String) -> Unit,
+        onLog: (String) -> Unit,
+        onProgress: (Int) -> Unit
+    ): RecapOutput {
+        if (useFrames) return renderYouTube(context, plan, cfg, onStep, onLog, onProgress)
+        val cache = File(context.cacheDir, "recap_work")
+        cache.mkdirs()
+        onStep(L.s(context, "အသံထုတ်နေသည်...", "Generating voice..."))
+        val wavs = withContext(Dispatchers.IO) { genWavs(context, cache, cfg, plan.segments, onLog, onProgress, 45, 20) }
+
+        onStep(L.s(context, "Recap video ဖွဲ့စည်းနေသည်...", "Composing recap video..."))
         onProgress(68)
         var cropL = 0f
         var cropR = 0f
@@ -178,9 +277,9 @@ object RecapPipeline {
         return RecapOutput(out, srt, plan.title, summary)
     }
 
-    suspend fun runFromYouTube(
+    suspend fun renderYouTube(
         context: Context,
-        url: String,
+        plan: RecapPlan,
         cfg: RecapConfig,
         onStep: (String) -> Unit,
         onLog: (String) -> Unit,
@@ -188,48 +287,23 @@ object RecapPipeline {
     ): RecapOutput {
         val cache = File(context.cacheDir, "recap_work")
         cache.mkdirs()
-        onLog("Recap style: " + cfg.style + "  speed=" + cfg.speed + "  vertical=" + cfg.vertical)
-        val prep = withContext(Dispatchers.IO) {
-            onStep("Gemini နဲ့ Video ခြုံငုံနေသည်...")
-            onProgress(18)
-            val plan: RecapPlan
-            if (cfg.transcriptMode && cfg.extKey.isNotEmpty()) {
-                plan = transcriptPlan(cfg, url, onLog)
-            } else if (cfg.provider == "custom") {
-                plan = try {
-                    GeminiClient.generatePlanCustom(cfg.baseUrl, cfg.customKey, cfg.customModel, url, false, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
-                } catch (e: Exception) {
-                    tryTranscriptFallback(e, cfg, url, onLog)
-                }
-            } else {
-                plan = try {
-                    GeminiClient.generatePlan(cfg.apiKey, cfg.model, url, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
-                } catch (e: Exception) {
-                    tryTranscriptFallback(e, cfg, url, onLog)
-                }
-            }
-            onProgress(45)
-            onStep("အသံထုတ်နေသည်...")
-            val w = genWavs(cache, cfg, plan.segments, onLog, onProgress, 45, 20)
-            Pair(plan, w)
-        }
-        val plan = prep.first
-        val wavs = prep.second
+        onStep(L.s(context, "အသံထုတ်နေသည်...", "Generating voice..."))
+        val wavs = withContext(Dispatchers.IO) { genWavs(context, cache, cfg, plan.segments, onLog, onProgress, 45, 20) }
 
-        onStep("ပုံဖရင်များ ဆွဲနေသည်...")
+        onStep(L.s(context, "ပုံဖရင်များ ဆွဲနေသည်...", "Rendering frames..."))
         val nSeg = plan.segments.size
         withContext(Dispatchers.IO) {
             for (i in plan.segments.indices) {
                 val f = File(cache, "frame_" + i + ".jpg")
-                FrameRenderer.render(plan.title, plan.segments[i].text, i, f, cfg.watermark, cfg.vertical)
+                FrameRenderer.render(plan.title, plan.segments[i].text, i, f, cfg.watermark, cfg.vertical, cfg.wmSize, cfg.wmPos, cfg.wmLogo, cfg.theme)
                 onProgress(66 + 6 * (i + 1) / nSeg)
             }
             if (cfg.introOutro) {
-                FrameRenderer.renderBranded(File(cache, "intro.jpg"), true, cfg.watermark, cfg.vertical)
-                FrameRenderer.renderBranded(File(cache, "outro.jpg"), false, cfg.watermark, cfg.vertical)
+                FrameRenderer.renderBranded(File(cache, "intro.jpg"), true, cfg.watermark, cfg.vertical, cfg.wmSize, cfg.wmPos, cfg.wmLogo, cfg.theme)
+                FrameRenderer.renderBranded(File(cache, "outro.jpg"), false, cfg.watermark, cfg.vertical, cfg.wmSize, cfg.wmPos, cfg.wmLogo, cfg.theme)
             }
         }
-        onStep("Recap video ဖွဲ့စည်းနေသည်...")
+        onStep(L.s(context, "Recap video ဖွဲ့စည်းနေသည်...", "Composing recap video..."))
         onProgress(74)
         val videoItems = ArrayList<EditedMediaItem>()
         if (cfg.introOutro) {
@@ -263,20 +337,22 @@ object RecapPipeline {
         return RecapOutput(out, srt, plan.title, summary)
     }
 
-    private fun tryTranscriptFallback(e: Exception, cfg: RecapConfig, url: String, onLog: (String) -> Unit): RecapPlan {
+    private fun tryTranscriptFallback(context: Context, e: Exception, cfg: RecapConfig, url: String, onLog: (String) -> Unit): RecapPlan {
         val m = (e.message ?: "").lowercase()
         val quota = m.contains("429") || m.contains("resource_exhausted") || m.contains("quota") || m.contains("rate limit")
         if (!quota || !cfg.transcriptFallback || cfg.extKey.isEmpty()) throw e
         onLog("Quota hit - transcript fallback (" + cfg.extModel + ")")
-        return transcriptPlan(cfg, url, onLog)
+        return transcriptPlan(context, cfg, url, onLog)
     }
 
-    private fun transcriptPlan(cfg: RecapConfig, url: String, onLog: (String) -> Unit): RecapPlan {
+    private fun transcriptPlan(context: Context, cfg: RecapConfig, url: String, onLog: (String) -> Unit): RecapPlan {
         val vid = TranscriptClient.extractVideoId(url) ?: throw IOException("YouTube link မှ video ID မရနိုင်ပါ")
         onLog("Fetching transcript: " + vid)
         val t = TranscriptClient.fetchTranscript(vid, onLog)
         onLog("Transcript ready: " + t.length + " chars - plan ဆွဲနေသည်")
-        return GeminiClient.generatePlanTranscript(cfg.extBase, cfg.extKey, cfg.extModel, t, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
+        val plan = GeminiClient.generatePlanTranscript(cfg.extBase, cfg.extKey, cfg.extModel, t, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
+        Prefs.bumpUsage(context, Prefs.KEY_U_EXT, 1)
+        return plan
     }
 
     private fun imageItem(f: File, durUs: Long): EditedMediaItem {
@@ -288,6 +364,7 @@ object RecapPipeline {
     }
 
     private suspend fun genWavs(
+        context: Context,
         cache: File,
         cfg: RecapConfig,
         segs: List<Segment>,
@@ -306,6 +383,7 @@ object RecapPipeline {
             list.add(f)
             onProgress(base + span * (i + 1) / segs.size)
         }
+        Prefs.bumpUsage(context, Prefs.KEY_U_TTS, list.size)
         list
     }
 
@@ -348,6 +426,37 @@ object RecapPipeline {
     }
 
     private var composeDone: ((ExportException?) -> Unit)? = null
+
+    private var extractDone: ((ExportException?) -> Unit)? = null
+
+    private suspend fun extractAudio(context: Context, src: File, out: File) {
+        if (out.exists()) out.delete()
+        val transformer = Transformer.Builder(context).build()
+        suspendCancellableCoroutine { cont ->
+            extractDone = { err: ExportException? ->
+                extractDone = null
+                if (err == null) {
+                    if (cont.isActive) cont.resume(Unit)
+                } else {
+                    if (cont.isActive) cont.resumeWithException(err)
+                }
+            }
+            transformer.addListener(object : Transformer.Listener {
+                override fun onCompleted(inputMediaItem: MediaItem, exportResult: ExportResult) {
+                    extractDone?.invoke(null)
+                }
+
+                override fun onError(inputMediaItem: MediaItem, exportResult: ExportResult, exportException: ExportException) {
+                    extractDone?.invoke(exportException)
+                }
+            })
+            val item = EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(src))).setRemoveVideo(true).build()
+            transformer.start(item, out.absolutePath)
+            cont.invokeOnCancellation {
+                runCatching { transformer.cancel() }
+            }
+        }
+    }
 
     fun buildSrt(segments: List<Segment>, wavs: List<File>, offsetMs: Long): String {
         val sb = StringBuilder()
