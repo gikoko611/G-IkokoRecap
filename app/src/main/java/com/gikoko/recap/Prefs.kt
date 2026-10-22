@@ -22,6 +22,8 @@ object Prefs {
     const val KEY_CUSTOM_KEY = "custom_key"
     const val KEY_CUSTOM_MODEL = "custom_model"
     const val KEY_STYLE = "recap_style"
+    const val KEY_SPEED = "recap_speed"
+    const val KEY_CUSTOM_STYLE = "custom_style"
 
     private val validModels = setOf("gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.8-flash-lite")
     private val validVoices = setOf("Sulafat", "Vindemiatrix", "Erinome", "Aoede", "Kore", "Leda", "Zephyr", "Despina", "Charon", "Iapetus", "Achird", "Orus", "Puck", "Fenrir", "Algenib", "Rasalgethi")
@@ -86,6 +88,17 @@ object Prefs {
 
     fun customModel(ctx: Context): String = str(ctx, KEY_CUSTOM_MODEL, "")
     fun minutes(ctx: Context): Int = int(ctx, KEY_MINUTES, 0)
+
+    fun speed(ctx: Context): Double {
+        val s = str(ctx, KEY_SPEED, "1.0")
+        return when (s) {
+            "0.85" -> 0.85
+            "1.2" -> 1.2
+            else -> 1.0
+        }
+    }
+
+    fun customStyle(ctx: Context): String = str(ctx, KEY_CUSTOM_STYLE, "")
     fun captions(ctx: Context): Boolean = bool(ctx, KEY_CAPTIONS, true)
     fun lang(ctx: Context): String = str(ctx, KEY_LANG, "my")
     fun quality(ctx: Context): Int = int(ctx, KEY_QUALITY, 1)

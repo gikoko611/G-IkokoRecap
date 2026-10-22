@@ -196,6 +196,49 @@ class HomeActivity : AppCompatActivity() {
                 .show()
         })
 
+        val followHead = TextView(this)
+        followHead.text = "CONTACT"
+        followHead.textSize = 11f
+        followHead.setTextColor(Color.parseColor("#3DE8F8"))
+        followHead.letterSpacing = 0.2f
+        followHead.setPadding(dp(12), dp(28), dp(12), dp(6))
+        panel.addView(followHead)
+
+        val social = LinearLayout(this)
+        social.orientation = LinearLayout.HORIZONTAL
+        social.setPadding(dp(12), 0, dp(12), 0)
+
+        fun socialCircle(label: String, bg: Int, url: String, mailto: Boolean) {
+            val tv = TextView(this)
+            tv.text = label
+            tv.textSize = 17f
+            tv.setTypeface(null, Typeface.BOLD)
+            tv.setTextColor(Color.parseColor("#FFFFFF"))
+            tv.gravity = Gravity.CENTER
+            tv.setBackgroundResource(bg)
+            val lp = LinearLayout.LayoutParams(dp(44), dp(44))
+            lp.rightMargin = dp(10)
+            social.addView(tv, lp)
+            tv.setOnClickListener {
+                if (mailto) {
+                    startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:" + url)))
+                } else {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                }
+            }
+        }
+        socialCircle("f", R.drawable.bg_circle_fb, "https://www.facebook.com/profile.php?id=61592311041041&mibextid=ZbWKwL", false)
+        socialCircle("M", R.drawable.bg_circle_gmail, "gikoko611@gmail.com", true)
+        socialCircle("G", R.drawable.bg_circle_github, "https://github.com/gikoko611", false)
+        panel.addView(social)
+
+        val followNote = TextView(this)
+        followNote.text = "f Facebook • M Gmail • G GitHub"
+        followNote.textSize = 10f
+        followNote.setTextColor(Color.parseColor("#5A6480"))
+        followNote.setPadding(dp(12), dp(6), dp(12), 0)
+        panel.addView(followNote)
+
         val foot = TextView(this)
         foot.text = "v2.1.1 Pro"
         foot.textSize = 11f
@@ -431,6 +474,14 @@ class HomeActivity : AppCompatActivity() {
         styleNote.textSize = 11f
         styleNote.setPadding(0, dp(8), 0, 0)
         cStyle.addView(styleNote)
+
+        val customStyleInput = EditText(this)
+        customStyleInput.hint = "ကိုယ်ပိုင် style ညွှန်ကြားချက် (optional)"
+        inputStyle(customStyleInput)
+        customStyleInput.setText(Prefs.customStyle(this))
+        val csiP = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        csiP.topMargin = dp(10)
+        cStyle.addView(customStyleInput, csiP)
         root.addView(cStyle)
 
         val c4 = card()
@@ -454,6 +505,25 @@ class HomeActivity : AppCompatActivity() {
         noteV.textSize = 11f
         noteV.setPadding(0, dp(6), 0, 0)
         c4.addView(noteV)
+
+        c4.addView(sectionTitle("အသံအရှိန် - SPEED"))
+        val spGroup = ChipGroup(this)
+        spGroup.isSingleSelection = true
+        spGroup.isSelectionRequired = true
+        val speedLabels = listOf("နှေးနှေး", "သာမန်", "မြန်မြန်")
+        val speedVals = listOf("0.85", "1.0", "1.2")
+        speedLabels.forEachIndexed { i, s ->
+            val ch = chipOf(s)
+            ch.id = 6000 + i
+            ch.setOnCheckedChangeListener { _, checked ->
+                if (checked) Prefs.save(this, Prefs.KEY_SPEED, speedVals[i])
+            }
+            spGroup.addView(ch)
+        }
+        val curSpeedVal = Prefs.speed(this)
+        val spIdx = speedVals.indexOf(curSpeedVal.toString())
+        spGroup.check(if (spIdx >= 0) 6000 + spIdx else 6001)
+        c4.addView(spGroup)
 
         val previewBtn = Button(this)
         previewBtn.text = "🔊 အသံစမ်းကြည့်မည် (PREVIEW)"
@@ -535,6 +605,7 @@ class HomeActivity : AppCompatActivity() {
                 start.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
             }
             Prefs.save(this, Prefs.KEY_VOICE, selectedVoice())
+            Prefs.save(this, Prefs.KEY_CUSTOM_STYLE, customStyleInput.text.toString().trim())
             Prefs.saveInt(this, Prefs.KEY_MINUTES, selectedMinutes())
             val i = Intent(this, ProcessingActivity::class.java)
             i.putExtra("api_key", key)
@@ -574,7 +645,7 @@ class HomeActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val (pcm, rate) = withContext(Dispatchers.IO) {
-                    GeminiClient.generateTts(key, "GIkoko One Recap မှ ကြိုဆိုပါတယ်။ ဒီက သင်ရွေးထားတဲ့ အသံပါ။", v)
+                    GeminiClient.generateTts(key, "GIkoko One Recap မှ ကြိုဆိုပါတယ်။ ဒီက သင်ရွေးထားတဲ့ အသံပါ။", v, Prefs.speed(this))
                 }
                 val wav = WavUtil.pcmToWav(pcm, rate)
                 val f = File(cacheDir, "voice_preview.wav")

@@ -44,7 +44,9 @@ data class RecapConfig(
     val watermark: Boolean,
     val introOutro: Boolean,
     val quality: Int,
-    val style: String
+    val style: String,
+    val speed: Double,
+    val customStyle: String
 )
 
 data class RecapOutput(val video: File, val srt: File, val title: String, val summary: String)
@@ -61,7 +63,7 @@ object RecapPipeline {
     ): RecapOutput {
         val cache = File(context.cacheDir, "recap_work")
         cache.mkdirs()
-        onLog("Recap style: " + cfg.style)
+        onLog("Recap style: " + cfg.style + "  speed=" + cfg.speed)
         val prep = withContext(Dispatchers.IO) {
             val plan: RecapPlan
             if (cfg.provider == "custom") {
@@ -72,7 +74,7 @@ object RecapPipeline {
                 onLog("Encoding file " + String.format("%.1f", mb) + " MB")
                 onProgress(18)
                 val b64 = android.util.Base64.encodeToString(srcFile.readBytes(), android.util.Base64.NO_WRAP)
-                plan = GeminiClient.generatePlanCustom(cfg.baseUrl, cfg.customKey, cfg.customModel, "data:video/mp4;base64," + b64, true, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, onLog)
+                plan = GeminiClient.generatePlanCustom(cfg.baseUrl, cfg.customKey, cfg.customModel, "data:video/mp4;base64," + b64, true, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
                 onProgress(45)
             } else {
                 onStep("Video ကို Gemini ဆီ တင်နေသည်...")
@@ -85,7 +87,7 @@ object RecapPipeline {
                 onProgress(12)
                 onStep("AI နဲ့ ခြုံငုံသုံးသပ်နေသည်...")
                 onProgress(18)
-                plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, ready, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, onLog)
+                plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, ready, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
                 onProgress(45)
             }
             onStep("အသံထုတ်နေသည်...")
@@ -149,15 +151,15 @@ object RecapPipeline {
     ): RecapOutput {
         val cache = File(context.cacheDir, "recap_work")
         cache.mkdirs()
-        onLog("Recap style: " + cfg.style)
+        onLog("Recap style: " + cfg.style + "  speed=" + cfg.speed)
         val prep = withContext(Dispatchers.IO) {
             onStep("Gemini နဲ့ Video ခြုံငုံနေသည်...")
             onProgress(18)
             val plan: RecapPlan
             if (cfg.provider == "custom") {
-                plan = GeminiClient.generatePlanCustom(cfg.baseUrl, cfg.customKey, cfg.customModel, url, false, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, onLog)
+                plan = GeminiClient.generatePlanCustom(cfg.baseUrl, cfg.customKey, cfg.customModel, url, false, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
             } else {
-                plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, url, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, onLog)
+                plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, url, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, onLog)
             }
             onProgress(45)
             onStep("အသံထုတ်နေသည်...")
@@ -232,7 +234,7 @@ object RecapPipeline {
         val list = ArrayList<File>()
         for (i in segs.indices) {
             onLog("TTS segment " + (i + 1) + "/" + segs.size + " voice=" + cfg.voice)
-            val (pcm, rate) = GeminiClient.generateTts(cfg.apiKey, segs[i].text, cfg.voice)
+            val (pcm, rate) = GeminiClient.generateTts(cfg.apiKey, segs[i].text, cfg.voice, cfg.speed)
             val wav = WavUtil.pcmToWav(pcm, rate)
             val f = File(cache, "seg_" + i + ".wav")
             f.writeBytes(wav)

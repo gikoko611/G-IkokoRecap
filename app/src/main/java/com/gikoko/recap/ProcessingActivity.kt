@@ -107,7 +107,9 @@ class ProcessingActivity : AppCompatActivity() {
             Prefs.watermark(this),
             Prefs.introOutro(this),
             Prefs.quality(this),
-            Prefs.style(this)
+            Prefs.style(this),
+            Prefs.speed(this),
+            Prefs.customStyle(this)
         )
         val source = intent.getStringExtra("source") ?: "youtube"
         val url = intent.getStringExtra("url") ?: ""
