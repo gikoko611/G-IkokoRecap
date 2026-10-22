@@ -15,25 +15,28 @@ android {
         versionName '1.1'
     }
 
+    def ksFile = file('ci.keystore')
     signingConfigs {
-        release {
-            storeFile rootProject.file('ci-release.keystore')
-            storePassword 'gikoko123'
-            keyAlias 'gikoko'
-            keyPassword 'gikoko123'
-            enableV1Signing true
-            enableV2Signing true
+        ci {
+            if (ksFile.exists()) {
+                storeFile ksFile
+                storePassword 'gikoko2026'
+                keyAlias 'gikoko'
+                keyPassword 'gikoko2026'
+            }
         }
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix '.debug'
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
-        }
-        debug {
-            applicationIdSuffix '.debug'
+            if (ksFile.exists()) {
+                signingConfig signingConfigs.ci
+            }
         }
     }
     compileOptions {

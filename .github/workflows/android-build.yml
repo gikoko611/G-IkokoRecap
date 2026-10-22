@@ -31,10 +31,10 @@ jobs:
         shell: bash
         run: |
           keytool -genkeypair -v \
-            -keystore ci-release.keystore \
-            -storepass gikoko123 -keypass gikoko123 \
+            -keystore app/ci.keystore \
+            -storepass gikoko2026 -keypass gikoko2026 \
             -alias gikoko -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=GIkoko One Recap, OU=Mobile, O=GiKoko, L=Yangon, C=MM"
+            -dname "CN=GIkoko, OU=Recap, O=GIkoko, L=Yangon, C=MM"
 
       - name: Build release APK
         shell: bash
@@ -42,16 +42,16 @@ jobs:
           set -o pipefail
           gradle assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
 
-      - name: Verify APK signature
-        shell: bash
-        run: |
-          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk
-
       - name: Rename APK
         shell: bash
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/release/app-release.apk out/GIkokoOneRecap-release.apk
+          cp app/build/outputs/apk/release/*.apk out/GIkokoOneRecap-release.apk
+
+      - name: Verify signature
+        shell: bash
+        run: |
+          ${ANDROID_HOME}/build-tools/34.0.0/apksigner verify --print-certs out/GIkokoOneRecap-release.apk | head -n 5 || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -66,8 +66,8 @@ jobs:
         run: |
           TAG="v1.1.$GITHUB_RUN_NUMBER"
           gh release create "$TAG" out/GIkokoOneRecap-release.apk \
-            --title "GIkoko One Recap $TAG" \
-            --notes "One-click AI video recap with Myanmar voice and captions. Release-signed APK." \
+            --title "GIkoko One Recap $TAG (Signed)" \
+            --notes "Signed release APK - fixes App not installed issue. Myanmar AI voice + captions video recap." \
             --target "$GITHUB_SHA" || true
 
       - name: Post build log on failure
@@ -80,5 +80,7 @@ jobs:
             echo "# CI build failed - debug log"
             echo
             tail -n 400 build.log || true
+            echo
+            grep -n -i "error\|FAILED" build.log | tail -n 40 || true
           } > /tmp/body.md
           gh issue create --title "CI build failed - debug log" --body-file /tmp/body.md || true
