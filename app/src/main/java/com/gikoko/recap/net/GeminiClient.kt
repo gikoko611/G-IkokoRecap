@@ -19,13 +19,21 @@ object GeminiClient {
 
     private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
     private const val BASE = "https://generativelanguage.googleapis.com"
-    const val TTS_MODEL = "gemini-2.5-flash-preview-tts"
+    const val TTS_MODEL = "gemini-3.8-flash-tts"
 
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(300, TimeUnit.SECONDS)
         .writeTimeout(300, TimeUnit.SECONDS)
         .build()
+
+    fun normalizeBase(url: String): String {
+        var u = url.trim()
+        while (u.endsWith("/")) {
+            u = u.substring(0, u.length - 1)
+        }
+        return u
+    }
 
     fun isYouTubeLink(url: String): Boolean {
         val pattern = Regex("^(https?://)?(www\\.)?(m\\.)?(youtube\\.com|youtu\\.be)/.+")
@@ -52,6 +60,46 @@ object GeminiClient {
             if (!resp.isSuccessful) throw IOException("HTTP " + resp.code + ": " + txt.take(300))
             val arr = JSONObject(txt).optJSONArray("models") ?: JSONArray()
             return "OK - models: " + arr.length()
+        }
+    }
+
+    fun testKeyCustom(baseUrl: String, apiKey: String): String {
+        val req = Request.Builder()
+            .url(normalizeBase(baseUrl) + "/models")
+            .header("Authorization", "Bearer " + apiKey)
+            .get()
+            .build()
+        client.newCall(req).execute().use { resp ->
+            val txt = resp.body?.string() ?: ""
+            if (!resp.isSuccessful) throw IOException("HTTP " + resp.code + ": " + txt.take(300))
+            val arr = JSONObject(txt).optJSONArray("data") ?: JSONArray()
+            return "OK - total models: " + arr.length()
+        }
+    }
+
+    fun listCustomModels(baseUrl: String, apiKey: String): ArrayList<String> {
+        val req = Request.Builder()
+            .url(normalizeBase(baseUrl) + "/models")
+            .header("Authorization", "Bearer " + apiKey)
+            .get()
+            .build()
+        client.newCall(req).execute().use { resp ->
+            val txt = resp.body?.string() ?: ""
+            if (!resp.isSuccessful) throw IOException("HTTP " + resp.code + ": " + txt.take(300))
+            val arr = JSONObject(txt).optJSONArray("data") ?: JSONArray()
+            val free = ArrayList<String>()
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                val id = o.optString("id", "")
+                if (id.isEmpty()) continue
+                val pricing = o.optJSONObject("pricing")
+                val promptFree = pricing != null && pricing.optString("prompt", "1") == "0"
+                val compFree = pricing != null && pricing.optString("completion", "1") == "0"
+                if (id.endsWith(":free") || (promptFree && compFree)) free.add(id)
+            }
+            free.sort()
+            if (free.isEmpty()) throw IOException("Free model တစ်ခုမှ မတွေ့ပါ - provider မှာ free model မရှိနိုင်ပါ")
+            return free
         }
     }
 
@@ -130,18 +178,10 @@ object GeminiClient {
         throw IOException("Timeout waiting for video upload")
     }
 
-    fun generatePlan(
-        apiKey: String,
-        model: String,
-        videoUri: String,
-        targetMinutes: Int,
-        lang: String,
-        full: Boolean,
-        onLog: (String) -> Unit
-    ): RecapPlan {
+    private fun planPrompt(targetMinutes: Int, lang: String, full: Boolean): String {
         val targetTxt = if (targetMinutes <= 0) "about 3 minutes" else ("about " + targetMinutes + " minutes")
         val segTxt = if (full) "6 to 12 segments" else "4 to 6 segments"
-        val prompt = if (lang == "en") {
+        return if (lang == "en") {
             "You are a video recap editor. The video is provided below. " +
                 "Create a short recap narration plan in ENGLISH language. " +
                 "The narration, when spoken, should total " + targetTxt + ". " +
@@ -160,6 +200,18 @@ object GeminiClient {
                 "Use " + segTxt + ". Each segment text must be one or two Myanmar sentences that summarize that part of the video. " +
                 "Each segment must be between 15 and 90 seconds long. No markdown, JSON only."
         }
+    }
+
+    fun generatePlan(
+        apiKey: String,
+        model: String,
+        videoUri: String,
+        targetMinutes: Int,
+        lang: String,
+        full: Boolean,
+        onLog: (String) -> Unit
+    ): RecapPlan {
+        val prompt = planPrompt(targetMinutes, lang, full)
         val textPart = JSONObject().put("text", prompt)
         val filePart = JSONObject().put("file_data", JSONObject().put("file_uri", videoUri))
         val content = JSONObject().put("parts", JSONArray().put(textPart).put(filePart))
@@ -171,6 +223,48 @@ object GeminiClient {
             .getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
         onLog("Plan: " + txt.take(300))
         return parsePlan(txt)
+    }
+
+    fun generatePlanCustom(
+        baseUrl: String,
+        apiKey: String,
+        model: String,
+        videoRef: String,
+        isDataUrl: Boolean,
+        targetMinutes: Int,
+        lang: String,
+        full: Boolean,
+        onLog: (String) -> Unit
+    ): RecapPlan {
+        val prompt = planPrompt(targetMinutes, lang, full)
+        val fileObj = JSONObject().put("filename", "video.mp4")
+        if (isDataUrl) {
+            fileObj.put("file_data", videoRef)
+        } else {
+            fileObj.put("file_url", videoRef)
+        }
+        val contentPart = JSONObject().put("type", "file").put("file", fileObj)
+        val textPart = JSONObject().put("type", "text").put("text", prompt)
+        val msg = JSONObject().put("role", "user")
+            .put("content", JSONArray().put(textPart).put(contentPart))
+        val body = JSONObject()
+            .put("model", model)
+            .put("messages", JSONArray().put(msg))
+        val req = Request.Builder()
+            .url(normalizeBase(baseUrl) + "/chat/completions")
+            .header("Authorization", "Bearer " + apiKey)
+            .post(body.toString().toRequestBody(JSON_MEDIA))
+            .build()
+        client.newCall(req).execute().use { resp ->
+            val txt = resp.body?.string() ?: ""
+            if (!resp.isSuccessful) throw IOException("HTTP " + resp.code + ": " + txt.take(400))
+            val j = JSONObject(txt)
+            val choices = j.optJSONArray("choices")
+                ?: throw IOException("No choices in response: " + txt.take(200))
+            val content = choices.getJSONObject(0).getJSONObject("message").optString("content", "")
+            onLog("Plan: " + content.take(300))
+            return parsePlan(content)
+        }
     }
 
     fun parsePlan(raw: String): RecapPlan {
@@ -195,9 +289,8 @@ object GeminiClient {
     }
 
     fun generateTts(apiKey: String, text: String, voice: String): Pair<ByteArray, Int> {
-        val spoken = if (text.contains(" ")) text else text
         val body = JSONObject()
-            .put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject().put("text", spoken)))))
+            .put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject().put("text", text)))))
             .put("generationConfig", JSONObject()
                 .put("responseModalities", JSONArray().put("AUDIO"))
                 .put("speechConfig", JSONObject().put("voiceConfig", JSONObject().put("prebuiltVoiceConfig", JSONObject().put("voiceName", voice)))))

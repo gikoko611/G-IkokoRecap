@@ -17,6 +17,10 @@ object Prefs {
     const val KEY_AUTOSAVE = "autosave"
     const val KEY_SEG_FULL = "seg_full"
     const val KEY_INTRO = "intro_outro"
+    const val KEY_PROVIDER = "provider"
+    const val KEY_BASE_URL = "base_url"
+    const val KEY_CUSTOM_KEY = "custom_key"
+    const val KEY_CUSTOM_MODEL = "custom_model"
 
     private fun sp(ctx: Context) = ctx.getSharedPreferences(NAME, Context.MODE_PRIVATE)
 
@@ -46,8 +50,12 @@ object Prefs {
 
     fun saveApiKey(ctx: Context, key: String) = save(ctx, KEY_API, key)
     fun apiKey(ctx: Context): String = str(ctx, KEY_API, "")
-    fun model(ctx: Context): String = str(ctx, KEY_MODEL, "gemini-2.5-flash")
-    fun voice(ctx: Context): String = str(ctx, KEY_VOICE, "Puck")
+    fun provider(ctx: Context): String = str(ctx, KEY_PROVIDER, "gemini")
+    fun baseUrl(ctx: Context): String = str(ctx, KEY_BASE_URL, "https://openrouter.ai/api/v1")
+    fun customKey(ctx: Context): String = str(ctx, KEY_CUSTOM_KEY, "")
+    fun customModel(ctx: Context): String = str(ctx, KEY_CUSTOM_MODEL, "")
+    fun model(ctx: Context): String = str(ctx, KEY_MODEL, "gemini-3.8-flash")
+    fun voice(ctx: Context): String = str(ctx, KEY_VOICE, "Sulafat")
     fun minutes(ctx: Context): Int = int(ctx, KEY_MINUTES, 0)
     fun captions(ctx: Context): Boolean = bool(ctx, KEY_CAPTIONS, true)
     fun lang(ctx: Context): String = str(ctx, KEY_LANG, "my")

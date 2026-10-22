@@ -19,16 +19,22 @@ import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
 import com.google.common.collect.ImmutableList
 import com.gikoko.recap.net.GeminiClient
+import com.gikoko.recap.net.RecapPlan
 import com.gikoko.recap.net.Segment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 data class RecapConfig(
     val apiKey: String,
+    val provider: String,
+    val baseUrl: String,
+    val customKey: String,
+    val customModel: String,
     val model: String,
     val voice: String,
     val targetMinutes: Int,
@@ -53,14 +59,24 @@ object RecapPipeline {
     ): RecapOutput {
         val cache = File(context.cacheDir, "recap_work")
         cache.mkdirs()
-        onStep("Video ကို Gemini ဆီ တင်နေသည်...")
         val prep = withContext(Dispatchers.IO) {
-            val mime = GeminiClient.guessMime(srcFile.name)
-            val fileName = GeminiClient.uploadVideo(cfg.apiKey, srcFile, mime, srcFile.name)
-            onLog("Upload: " + fileName)
-            val ready = GeminiClient.waitForFileReady(cfg.apiKey, fileName, onLog)
-            onStep("AI နဲ့ ခြုံငုံသုံးသပ်နေသည်...")
-            val plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, ready, cfg.targetMinutes, cfg.lang, cfg.fullSegments, onLog)
+            val plan: RecapPlan
+            if (cfg.provider == "custom") {
+                onStep("Custom provider နဲ့ ခြုံငုံနေသည်...")
+                val mb = srcFile.length() / (1024.0 * 1024.0)
+                if (mb > 24) throw IOException("Custom provider နဲ့ Video File mode မှာ 24MB အောက်ပဲရတယ်။ YouTube mode ကို သုံးပါ။")
+                onLog("Encoding file " + String.format("%.1f", mb) + " MB")
+                val b64 = android.util.Base64.encodeToString(srcFile.readBytes(), android.util.Base64.NO_WRAP)
+                plan = GeminiClient.generatePlanCustom(cfg.baseUrl, cfg.customKey, cfg.customModel, "data:video/mp4;base64," + b64, true, cfg.targetMinutes, cfg.lang, cfg.fullSegments, onLog)
+            } else {
+                onStep("Video ကို Gemini ဆီ တင်နေသည်...")
+                val mime = GeminiClient.guessMime(srcFile.name)
+                val fileName = GeminiClient.uploadVideo(cfg.apiKey, srcFile, mime, srcFile.name)
+                onLog("Upload: " + fileName)
+                val ready = GeminiClient.waitForFileReady(cfg.apiKey, fileName, onLog)
+                onStep("AI နဲ့ ခြုံငုံသုံးသပ်နေသည်...")
+                plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, ready, cfg.targetMinutes, cfg.lang, cfg.fullSegments, onLog)
+            }
             onStep("အသံထုတ်နေသည်...")
             val w = genWavs(cache, cfg, plan.segments, onLog)
             Pair(plan, w)
@@ -119,9 +135,14 @@ object RecapPipeline {
     ): RecapOutput {
         val cache = File(context.cacheDir, "recap_work")
         cache.mkdirs()
-        onStep("Gemini နဲ့ Video ခြုံငုံနေသည်...")
         val prep = withContext(Dispatchers.IO) {
-            val plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, url, cfg.targetMinutes, cfg.lang, cfg.fullSegments, onLog)
+            onStep("Gemini နဲ့ Video ခြုံငုံနေသည်...")
+            val plan: RecapPlan
+            if (cfg.provider == "custom") {
+                plan = GeminiClient.generatePlanCustom(cfg.baseUrl, cfg.customKey, cfg.customModel, url, false, cfg.targetMinutes, cfg.lang, cfg.fullSegments, onLog)
+            } else {
+                plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, url, cfg.targetMinutes, cfg.lang, cfg.fullSegments, onLog)
+            }
             onStep("အသံထုတ်နေသည်...")
             val w = genWavs(cache, cfg, plan.segments, onLog)
             Pair(plan, w)

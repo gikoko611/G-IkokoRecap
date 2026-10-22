@@ -48,6 +48,10 @@ class ProcessingActivity : AppCompatActivity() {
         val apiKey = if (saved.isNotEmpty()) saved else (intent.getStringExtra("api_key") ?: "")
         val cfg = RecapConfig(
             apiKey,
+            Prefs.provider(this),
+            Prefs.baseUrl(this),
+            Prefs.customKey(this),
+            Prefs.customModel(this),
             Prefs.model(this),
             Prefs.voice(this),
             Prefs.minutes(this),
