@@ -33,6 +33,7 @@ class ResultActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        DebugLog.log(this, "open result")
         setContentView(R.layout.activity_result)
         val root = findViewById<LinearLayout>(R.id.rootContainer)
         val vPath = intent.getStringExtra("video") ?: ""

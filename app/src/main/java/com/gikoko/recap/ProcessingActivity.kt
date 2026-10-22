@@ -51,6 +51,7 @@ class ProcessingActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        DebugLog.log(this, "open processing")
         setContentView(R.layout.activity_processing)
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         startAt = SystemClock.elapsedRealtime()

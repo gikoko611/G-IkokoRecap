@@ -34,6 +34,7 @@ class VoiceLabActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        DebugLog.log(this, "open voicelab")
         val scroll = ScrollView(this)
         scroll.setBackgroundColor(Color.parseColor("#05070E"))
         scroll.setFillViewport(true)
