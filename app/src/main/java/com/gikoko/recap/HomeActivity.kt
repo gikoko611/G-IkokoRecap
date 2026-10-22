@@ -6,11 +6,13 @@ import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
+import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
@@ -18,10 +20,13 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
+import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.lifecycleScope
 import com.gikoko.recap.net.GeminiClient
+import com.gikoko.recap.recap.WavUtil
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import kotlinx.coroutines.Dispatchers
@@ -38,14 +43,17 @@ class HomeActivity : AppCompatActivity() {
     private var mode = "youtube"
     private var pickedFile: File? = null
     private var captionsOn = true
+    private var segsFull = false
+    private var previewPlayer: MediaPlayer? = null
 
-    private lateinit var apiInput: EditText
+    private lateinit var drawer: DrawerLayout
     private lateinit var linkInput: EditText
     private lateinit var linkBox: LinearLayout
     private lateinit var fileBox: LinearLayout
     private lateinit var fileLabel: TextView
     private lateinit var voiceGroup: ChipGroup
     private lateinit var lengthGroup: ChipGroup
+    private lateinit var statusCard: LinearLayout
     private var ytBtn: Button? = null
     private var fileBtn: Button? = null
 
@@ -56,8 +64,25 @@ class HomeActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_home)
+        drawer = findViewById(R.id.drawerLayout)
         val root = findViewById<LinearLayout>(R.id.rootContainer)
+        val panel = findViewById<LinearLayout>(R.id.drawerPanel)
+        findViewById<TextView>(R.id.drawerBtn).setOnClickListener {
+            drawer.openDrawer(Gravity.START)
+        }
+        buildDrawer(panel)
         buildUi(root)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::statusCard.isInitialized) refreshStatus()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        previewPlayer?.release()
+        previewPlayer = null
     }
 
     private fun dp(v: Int): Int {
@@ -118,12 +143,119 @@ class HomeActivity : AppCompatActivity() {
         e.setPadding(dp(12), dp(12), dp(12), dp(12))
     }
 
+    private fun menuItem(label: String, onClick: () -> Unit): TextView {
+        val tv = TextView(this)
+        tv.text = label
+        tv.textSize = 15f
+        tv.setTextColor(Color.parseColor("#C9D2EC"))
+        tv.setPadding(dp(12), dp(16), dp(12), dp(16))
+        tv.setOnClickListener { onClick() }
+        return tv
+    }
+
+    private fun buildDrawer(panel: LinearLayout) {
+        val head = TextView(this)
+        head.text = "GIKOKO"
+        head.textSize = 22f
+        head.setTypeface(null, Typeface.BOLD)
+        head.setTextColor(Color.parseColor("#FFC940"))
+        head.letterSpacing = 0.2f
+        head.setPadding(dp(12), dp(24), dp(12), dp(2))
+        panel.addView(head)
+
+        val sub = TextView(this)
+        sub.text = "ONE RECAP PRO"
+        sub.textSize = 12f
+        sub.setTextColor(Color.parseColor("#3DE8F8"))
+        sub.letterSpacing = 0.25f
+        sub.setPadding(dp(12), 0, dp(12), dp(16))
+        panel.addView(sub)
+
+        val divider = View(this)
+        divider.setBackgroundColor(Color.parseColor("#223055"))
+        val dp1 = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1))
+        panel.addView(divider, dp1)
+
+        panel.addView(menuItem("🏠  Home") { drawer.closeDrawer(Gravity.START) })
+        panel.addView(menuItem("⚙️  Settings") {
+            drawer.closeDrawer(Gravity.START)
+            startActivity(Intent(this, SettingsActivity::class.java))
+        })
+        panel.addView(menuItem("🕘  History") {
+            drawer.closeDrawer(Gravity.START)
+            startActivity(Intent(this, HistoryActivity::class.java))
+        })
+        panel.addView(menuItem("ℹ️  About") {
+            drawer.closeDrawer(Gravity.START)
+            AlertDialog.Builder(this)
+                .setTitle("GIkoko One Recap")
+                .setMessage("Version 2.0 (Pro)\n\nAI video recap - Myanmar voice + captions.\nPowered by Gemini. Developed by I Ko Ko.")
+                .setPositiveButton("OK", null)
+                .show()
+        })
+
+        val foot = TextView(this)
+        foot.text = "v2.0 Pro"
+        foot.textSize = 11f
+        foot.setTextColor(Color.parseColor("#5A6480"))
+        val fp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        fp.topMargin = dp(40)
+        panel.addView(foot, fp)
+    }
+
+    private fun refreshStatus() {
+        statusCard.removeAllViews()
+        val key = Prefs.apiKey(this)
+        if (key.isEmpty()) {
+            val warn = TextView(this)
+            warn.text = "API key မထည့်ရသေးပါ"
+            warn.setTextColor(Color.parseColor("#FFC940"))
+            warn.textSize = 15f
+            warn.setTypeface(null, Typeface.BOLD)
+            statusCard.addView(warn)
+
+            val note = TextView(this)
+            note.text = "Recap လုပ်ဖို့ Gemini API key လိုပါတယ်။ Settings မှာ ထည့်ပေးပါ။"
+            note.setTextColor(Color.parseColor("#8A93B2"))
+            note.textSize = 12f
+            note.setPadding(0, dp(6), 0, dp(10))
+            statusCard.addView(note)
+
+            val go = Button(this)
+            go.text = "SETTINGS မှာ ထည့်မည်"
+            go.isAllCaps = false
+            go.textSize = 13f
+            go.setTextColor(Color.parseColor("#0A0A00"))
+            go.setTypeface(null, Typeface.BOLD)
+            go.setBackgroundResource(R.drawable.bg_gold_btn)
+            go.setPadding(dp(8), dp(12), dp(8), dp(12))
+            go.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
+            statusCard.addView(go)
+        } else {
+            val ok = TextView(this)
+            ok.text = "API KEY ✓ သင့်နေပါပြီ"
+            ok.setTextColor(Color.parseColor("#3DE8F8"))
+            ok.textSize = 15f
+            ok.setTypeface(null, Typeface.BOLD)
+            statusCard.addView(ok)
+
+            val info = TextView(this)
+            info.text = "Model: " + Prefs.model(this) + "  \u2022  Voice: " + Prefs.voice(this) + "  \u2022  ပြောင်းချင်ရင် နှိပ်ပါ"
+            info.setTextColor(Color.parseColor("#8A93B2"))
+            info.textSize = 11f
+            info.setPadding(0, dp(6), 0, 0)
+            statusCard.addView(info)
+
+            statusCard.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
+        }
+    }
+
     private fun buildUi(root: LinearLayout) {
         val logo = ImageView(this)
         logo.setImageResource(R.drawable.img_splash_logo)
         logo.adjustViewBounds = true
         val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-        lp.setMargins(dp(48), dp(40), dp(48), dp(4))
+        lp.setMargins(dp(48), dp(16), dp(48), dp(4))
         root.addView(logo, lp)
 
         val tag = TextView(this)
@@ -136,21 +268,9 @@ class HomeActivity : AppCompatActivity() {
         tp.setMargins(0, dp(4), 0, dp(12))
         root.addView(tag, tp)
 
-        val c1 = card()
-        c1.addView(sectionTitle("GEMINI API KEY"))
-        apiInput = EditText(this)
-        apiInput.hint = "aistudio.google.com/apikey"
-        inputStyle(apiInput)
-        val saved = Prefs.apiKey(this)
-        if (saved.isNotEmpty()) apiInput.setText(saved)
-        c1.addView(apiInput)
-        val note1 = TextView(this)
-        note1.text = "API key ကို app ထဲမှာဘဲ သိမ်းမယ် (Google က ယူပါ)"
-        note1.setTextColor(Color.parseColor("#8A93B2"))
-        note1.textSize = 11f
-        note1.setPadding(0, dp(8), 0, 0)
-        c1.addView(note1)
-        root.addView(c1)
+        statusCard = card()
+        refreshStatus()
+        root.addView(statusCard)
 
         val c2 = card()
         c2.addView(sectionTitle("VIDEO SOURCE"))
@@ -223,8 +343,29 @@ class HomeActivity : AppCompatActivity() {
             ch.id = 1000 + i
             lengthGroup.addView(ch)
         }
-        lengthGroup.check(1000)
+        val curMin = Prefs.minutes(this)
+        val li = minutesOf.indexOf(curMin)
+        lengthGroup.check(if (li >= 0) 1000 + li else 1000)
         c3.addView(lengthGroup)
+
+        c3.addView(sectionTitle("SEGMENTS"))
+        val sg = ChipGroup(this)
+        sg.isSingleSelection = true
+        sg.isSelectionRequired = true
+        listOf("Compact", "Full").forEachIndexed { i, s ->
+            val ch = chipOf(s)
+            ch.id = 3100 + i
+            ch.setOnCheckedChangeListener { _, checked ->
+                if (checked) {
+                    segsFull = i == 1
+                    Prefs.saveBool(this, Prefs.KEY_SEG_FULL, segsFull)
+                }
+            }
+            sg.addView(ch)
+        }
+        segsFull = Prefs.segFull(this)
+        sg.check(if (segsFull) 3101 else 3100)
+        c3.addView(sg)
         root.addView(c3)
 
         val c4 = card()
@@ -237,8 +378,22 @@ class HomeActivity : AppCompatActivity() {
             ch.id = 2000 + i
             voiceGroup.addView(ch)
         }
-        voiceGroup.check(2000)
+        val curVoice = Prefs.voice(this)
+        val vi = voices.indexOf(curVoice)
+        voiceGroup.check(if (vi >= 0) 2000 + vi else 2000)
         c4.addView(voiceGroup)
+
+        val previewBtn = Button(this)
+        previewBtn.text = "🔊 အသံစမ်းကြည့်မည် (PREVIEW)"
+        previewBtn.isAllCaps = false
+        previewBtn.textSize = 13f
+        previewBtn.setTextColor(Color.parseColor("#F2F5FF"))
+        previewBtn.setBackgroundResource(R.drawable.bg_chip_selected)
+        previewBtn.setPadding(dp(8), dp(12), dp(8), dp(12))
+        val pp4 = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        pp4.topMargin = dp(10)
+        c4.addView(previewBtn, pp4)
+        previewBtn.setOnClickListener { previewVoice() }
         root.addView(c4)
 
         val c5 = card()
@@ -247,8 +402,12 @@ class HomeActivity : AppCompatActivity() {
         sw.text = "မြန်မာစာတန်းထိုး ထည့်မယ်"
         sw.textSize = 14f
         sw.setTextColor(Color.parseColor("#F2F5FF"))
-        sw.isChecked = true
-        sw.setOnCheckedChangeListener { _, checked -> captionsOn = checked }
+        captionsOn = Prefs.captions(this)
+        sw.isChecked = captionsOn
+        sw.setOnCheckedChangeListener { _, checked ->
+            captionsOn = checked
+            Prefs.saveBool(this, Prefs.KEY_CAPTIONS, checked)
+        }
         c5.addView(sw)
         root.addView(c5)
 
@@ -278,7 +437,7 @@ class HomeActivity : AppCompatActivity() {
         beat.start()
 
         val ver = TextView(this)
-        ver.text = "GIkoko One Recap v1.0 \u2022 powered by Gemini"
+        ver.text = "GIkoko One Recap v2.0 Pro \u2022 powered by Gemini"
         ver.gravity = Gravity.CENTER
         ver.setTextColor(Color.parseColor("#5A6480"))
         ver.textSize = 11f
@@ -287,17 +446,19 @@ class HomeActivity : AppCompatActivity() {
         root.addView(ver, vp)
 
         start.setOnClickListener {
-            val apiKey = apiInput.text.toString().trim()
-            if (apiKey.isEmpty()) {
-                Toast.makeText(this, "Gemini API key ထည့်ပေးပါ", Toast.LENGTH_LONG).show()
+            val key = Prefs.apiKey(this)
+            if (key.isEmpty()) {
+                Toast.makeText(this, "Settings မှာ Gemini API key ထည့်ပေးပါ", Toast.LENGTH_LONG).show()
+                startActivity(Intent(this, SettingsActivity::class.java))
                 return@setOnClickListener
             }
-            Prefs.saveApiKey(this, apiKey)
+            if (Prefs.haptic(this)) {
+                start.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+            }
+            Prefs.save(this, Prefs.KEY_VOICE, selectedVoice())
+            Prefs.saveInt(this, Prefs.KEY_MINUTES, selectedMinutes())
             val i = Intent(this, ProcessingActivity::class.java)
-            i.putExtra("api_key", apiKey)
-            i.putExtra("voice", selectedVoice())
-            i.putExtra("minutes", selectedMinutes())
-            i.putExtra("captions", captionsOn)
+            i.putExtra("api_key", key)
             if (mode == "youtube") {
                 val url = linkInput.text.toString().trim()
                 if (url.isEmpty()) {
@@ -320,6 +481,33 @@ class HomeActivity : AppCompatActivity() {
                 i.putExtra("path", f.absolutePath)
             }
             startActivity(i)
+        }
+    }
+
+    private fun previewVoice() {
+        val key = Prefs.apiKey(this)
+        if (key.isEmpty()) {
+            Toast.makeText(this, "Settings မှာ API key ထည့်ပေးပါ", Toast.LENGTH_LONG).show()
+            return
+        }
+        val v = selectedVoice()
+        Toast.makeText(this, "အသံထုတ်နေသည်...", Toast.LENGTH_SHORT).show()
+        lifecycleScope.launch {
+            try {
+                val (pcm, rate) = withContext(Dispatchers.IO) {
+                    GeminiClient.generateTts(key, "GIkoko One Recap မှ ကြိုဆိုပါတယ်။ ဒီက သင်ရွေးထားတဲ့ အသံပါ။", v)
+                }
+                val wav = WavUtil.pcmToWav(pcm, rate)
+                val f = File(cacheDir, "voice_preview.wav")
+                withContext(Dispatchers.IO) { f.writeBytes(wav) }
+                previewPlayer?.release()
+                previewPlayer = MediaPlayer()
+                previewPlayer?.setDataSource(f.absolutePath)
+                previewPlayer?.prepare()
+                previewPlayer?.start()
+            } catch (e: Exception) {
+                Toast.makeText(this@HomeActivity, "အသံစမ်းမအောင်မြင်: " + (e.message ?: ""), Toast.LENGTH_LONG).show()
+            }
         }
     }
 
@@ -359,9 +547,9 @@ class HomeActivity : AppCompatActivity() {
 
     private fun selectedVoice(): String {
         val id = voiceGroup.checkedChipId
-        if (id == View.NO_ID) return "Puck"
+        if (id == View.NO_ID) return Prefs.voice(this)
         val c = voiceGroup.findViewById<Chip>(id)
-        return c?.text?.toString() ?: "Puck"
+        return c?.text?.toString() ?: Prefs.voice(this)
     }
 
     private fun selectedMinutes(): Int {

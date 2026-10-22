@@ -1,5 +1,4 @@
 name: Android CI Build
-
 on:
   push:
     branches: [ "main" ]
@@ -64,10 +63,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v1.1.$GITHUB_RUN_NUMBER"
+          TAG="v2.0.$GITHUB_RUN_NUMBER"
           gh release create "$TAG" out/GIkokoOneRecap-release.apk \
-            --title "GIkoko One Recap $TAG (Signed)" \
-            --notes "Signed release APK - fixes App not installed issue. Myanmar AI voice + captions video recap." \
+            --title "GIkoko One Recap $TAG (Pro, Signed)" \
+            --notes "Pro v2.0: Settings, History, Drawer, 20+ features. Myanmar AI voice + captions video recap." \
             --target "$GITHUB_SHA" || true
 
       - name: Post build log on failure
