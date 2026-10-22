@@ -1,7 +1,9 @@
 package com.gikoko.recap
 
 import android.content.Context
+import org.json.JSONObject
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -56,6 +58,7 @@ object Prefs {
     const val KEY_PODCAST = "podcast_export"
     const val KEY_TTS_ENGINE = "tts_engine"
     const val KEY_EDGE_VOICE = "edge_voice"
+    const val KEY_U_HIST = "usage_hist"
 
     private val validModels = setOf("gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.8-flash-lite")
     private val validVoices = setOf("Sulafat", "Vindemiatrix", "Erinome", "Aoede", "Kore", "Leda", "Zephyr", "Despina", "Charon", "Iapetus", "Achird", "Orus", "Puck", "Fenrir", "Algenib", "Rasalgethi")
@@ -175,15 +178,70 @@ object Prefs {
         val d = today(ctx)
         val saved = str(ctx, KEY_U_DATE, "")
         if (saved != d) {
-            sp(ctx).edit().putString(KEY_U_DATE, d).putInt(key, n).apply()
+            if (saved.isNotEmpty()) rollHistory(ctx, saved)
+            sp(ctx).edit()
+                .putString(KEY_U_DATE, d)
+                .putInt(KEY_U_PLAN, 0).putInt(KEY_U_TTS, 0).putInt(KEY_U_EXT, 0).putInt(KEY_U_ASR, 0)
+                .putInt(key, n)
+                .apply()
             return
         }
         val cur = int(ctx, key, 0)
         sp(ctx).edit().putInt(key, cur + n).apply()
     }
 
+    private fun dayJson(ctx: Context): JSONObject {
+        val j = JSONObject()
+        j.put("plan", int(ctx, KEY_U_PLAN, 0))
+        j.put("tts", int(ctx, KEY_U_TTS, 0))
+        j.put("ext", int(ctx, KEY_U_EXT, 0))
+        j.put("asr", int(ctx, KEY_U_ASR, 0))
+        return j
+    }
+
+    private fun rollHistory(ctx: Context, date: String) {
+        runCatching {
+            val raw = str(ctx, KEY_U_HIST, "{}")
+            val j = if (raw.isEmpty()) JSONObject() else JSONObject(raw)
+            j.put(date, dayJson(ctx))
+            val keys = ArrayList<String>()
+            val it = j.keys()
+            while (it.hasNext()) keys.add(it.next())
+            keys.sort()
+            if (keys.size > 7) {
+                for (k in keys.take(keys.size - 7)) j.remove(k)
+            }
+            sp(ctx).edit().putString(KEY_U_HIST, j.toString()).apply()
+        }
+    }
+
+    fun usageWeek(ctx: Context): List<Pair<String, IntArray>> {
+        val out = ArrayList<Pair<String, IntArray>>()
+        for (i in 6 downTo 1) {
+            val cal = Calendar.getInstance()
+            cal.add(Calendar.DAY_OF_YEAR, -i)
+            val ds = SimpleDateFormat("yyyyMMdd", Locale.US).format(cal.time)
+            val j = runCatching { JSONObject(str(ctx, KEY_U_HIST, "{}")).optJSONObject(ds) }.getOrNull()
+            val a = intArrayOf(
+                j?.optInt("plan", 0) ?: 0,
+                j?.optInt("tts", 0) ?: 0,
+                j?.optInt("ext", 0) ?: 0,
+                j?.optInt("asr", 0) ?: 0
+            )
+            out.add(Pair(ds, a))
+        }
+        out.add(Pair(today(ctx), intArrayOf(
+            int(ctx, KEY_U_PLAN, 0),
+            int(ctx, KEY_U_TTS, 0),
+            int(ctx, KEY_U_EXT, 0),
+            int(ctx, KEY_U_ASR, 0)
+        )))
+        return out
+    }
+
     fun resetUsage(ctx: Context) {
-        sp(ctx).edit().putInt(KEY_U_PLAN, 0).putInt(KEY_U_TTS, 0).putInt(KEY_U_EXT, 0).putInt(KEY_U_ASR, 0).apply()
+        sp(ctx).edit().putInt(KEY_U_PLAN, 0).putInt(KEY_U_TTS, 0).putInt(KEY_U_EXT, 0).putInt(KEY_U_ASR, 0)
+            .putString(KEY_U_HIST, "{}").apply()
     }
 
     fun usageLine(ctx: Context): String {
@@ -191,3 +249,4 @@ object Prefs {
             "  •  Text: " + int(ctx, KEY_U_EXT, 0) + "  •  ASR: " + int(ctx, KEY_U_ASR, 0) + "  (" + str(ctx, KEY_U_DATE, "") + ")"
     }
 }
+

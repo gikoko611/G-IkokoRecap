@@ -46,6 +46,7 @@ class ToolsActivity : AppCompatActivity() {
     private lateinit var customModelsGroup: ChipGroup
     private lateinit var modelStatus: TextView
     private lateinit var usageText: TextView
+    private lateinit var weekText: TextView
     private var testPlayer: MediaPlayer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -286,6 +287,11 @@ class ToolsActivity : AppCompatActivity() {
                 .show()
         })
         root.addView(g2)
+
+        val g3 = gridRow()
+        addGridBox(g3, gridBox("🪄", "WM REMOVER") { startActivity(Intent(this, WatermarkActivity::class.java)) })
+        addGridBox(g3, gridBox("💬", "SRT EXPORT") { startActivity(Intent(this, SrtActivity::class.java)) })
+        root.addView(g3)
 
         val ce = card()
         ce.addView(sectionTitle("TTS ENGINE - အသံထုတ် ယန္တရား"))
@@ -606,6 +612,28 @@ class ToolsActivity : AppCompatActivity() {
         cth.addView(thG)
         root.addView(cth)
 
+        val cu = card()
+        cu.addView(sectionTitle("📊 API USAGE TRACKER"))
+        usageText = TextView(this)
+        usageText.setTextColor(Color.parseColor("#C9D2EC"))
+        usageText.textSize = 13f
+        cu.addView(usageText, topParams())
+        weekText = TextView(this)
+        weekText.setTextColor(Color.parseColor("#8A93B2"))
+        weekText.textSize = 11f
+        weekText.setTypeface(Typeface.MONOSPACE)
+        cu.addView(weekText, topParams())
+        val resetU = flatBtn("RESET USAGE", R.drawable.bg_mode_card, "#C9D2EC")
+        cu.addView(resetU, topParams())
+        resetU.setOnClickListener {
+            Prefs.resetUsage(this)
+            refreshUsage()
+            Toast.makeText(this, "Reset လုပ်ပြီးပါပြီ", Toast.LENGTH_SHORT).show()
+        }
+        val noteU = note("P = Plan (Gemini/Custom ခြုံငုံ)  •  T = TTS segments  •  X = Text (transcript plan)  •  A = ASR (Whisper)။ နေ့စဉ် သုံးစွဲမှုကို 7 ရက် bar ပုံစံ ပြပါတယ်။")
+        cu.addView(noteU, topParams())
+        root.addView(cu)
+
         val capp = card()
         capp.addView(sectionTitle("APP LANGUAGE - UI"))
         val uiG = ChipGroup(this)
@@ -628,18 +656,6 @@ class ToolsActivity : AppCompatActivity() {
         uiG.check(if (Prefs.uiLang(this) == "en") 42301 else 42300)
         capp.addView(uiG)
         capp.addView(switchRow("Recap မစခင် PLAN တည်းဖြတ်မည် (PLAN EDITOR)", Prefs.KEY_PLAN_CONFIRM, true), topParams())
-        capp.addView(sectionTitle("API USAGE - TODAY"))
-        usageText = TextView(this)
-        usageText.setTextColor(Color.parseColor("#C9D2EC"))
-        usageText.textSize = 13f
-        capp.addView(usageText, topParams())
-        val resetU = flatBtn("RESET USAGE", R.drawable.bg_mode_card, "#C9D2EC")
-        capp.addView(resetU, topParams())
-        resetU.setOnClickListener {
-            Prefs.resetUsage(this)
-            refreshUsage()
-            Toast.makeText(this, "Reset လုပ်ပြီးပါပြီ", Toast.LENGTH_SHORT).show()
-        }
         root.addView(capp)
 
         val c4 = card()
@@ -732,6 +748,23 @@ class ToolsActivity : AppCompatActivity() {
 
     private fun refreshUsage() {
         if (::usageText.isInitialized) usageText.text = Prefs.usageLine(this)
+        if (::weekText.isInitialized) weekText.text = weekBars()
+    }
+
+    private fun weekBars(): String {
+        val days = Prefs.usageWeek(this)
+        var max = 1
+        for ((_, a) in days) max = maxOf(max, a[0] + a[1] + a[2] + a[3])
+        val sb = StringBuilder()
+        for ((ds, a) in days) {
+            val total = a[0] + a[1] + a[2] + a[3]
+            val filled = total * 10 / max
+            val label = if (ds.length >= 8) ds.substring(4, 6) + "-" + ds.substring(6, 8) else ds
+            sb.append(label).append(" ")
+            for (i in 0 until 10) sb.append(if (i < filled) "▓" else "░")
+            sb.append(" ").append(total).append("  P").append(a[0]).append(" T").append(a[1]).append(" X").append(a[2]).append(" A").append(a[3]).append('\n')
+        }
+        return sb.toString().trim()
     }
 
     override fun onResume() {
@@ -745,3 +778,4 @@ class ToolsActivity : AppCompatActivity() {
         super.onDestroy()
     }
 }
+
