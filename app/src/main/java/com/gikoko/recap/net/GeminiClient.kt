@@ -2,6 +2,7 @@ package com.gikoko.recap.net
 
 import android.util.Base64
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
@@ -207,7 +208,7 @@ object GeminiClient {
     }
 
     private fun planPrompt(targetMinutes: Int, lang: String, full: Boolean, style: String, custom: String): String {
-        val targetTxt = if (targetMinutes <= 0) "about 3 minutes" else ("about " + targetMinutes + " minutes")
+        val targetTxt = if (targetMinutes == -1) "the ideal length for this content (you decide, between 1 and 5 minutes)" else if (targetMinutes <= 0) "about 3 minutes" else ("about " + targetMinutes + " minutes")
         val segTxt = if (full) "6 to 12 segments" else "4 to 6 segments"
         val styleTxt = styleBrief(style, lang)
         val customTxt = if (custom.isNotBlank()) ("Additional narration style instructions from the user (must follow): " + custom.trim() + " ") else ""
@@ -351,6 +352,85 @@ object GeminiClient {
             }
             Thread.sleep(3000L * attempt)
         }
+    }
+
+    fun voiceMatch(apiKey: String, model: String, sample: File, onLog: (String) -> Unit): Pair<String, String> {
+        val mime = guessMime(sample.name)
+        val fileName = uploadVideo(apiKey, sample, mime, sample.name)
+        val ready = waitForFileReady(apiKey, fileName, onLog)
+        val voices = "Sulafat, Vindemiatrix, Erinome, Aoede, Kore, Leda, Zephyr, Despina, Charon, Iapetus, Achird, Orus, Puck, Fenrir, Algenib, Rasalgethi"
+        val prompt = "Listen to this short voice sample. From this exact list of prebuilt voices, pick the ONE that is closest in gender, pitch, tone and speaking style: " + voices + ". " +
+            "Also write one short English sentence of narration style instructions to imitate the sample speaker's delivery (energy, pace, formality). " +
+            "Return STRICT JSON only: {\"voice\":\"ChosenVoice\",\"style\":\"style instruction\"}"
+        val textPart = JSONObject().put("text", prompt)
+        val filePart = JSONObject().put("file_data", JSONObject().put("file_uri", ready))
+        val content = JSONObject().put("parts", JSONArray().put(textPart).put(filePart))
+        val body = JSONObject()
+            .put("contents", JSONArray().put(content))
+            .put("generationConfig", JSONObject().put("temperature", 0.2).put("response_mime_type", "application/json"))
+        val resp = post(apiKey, "/v1beta/models/" + model + ":generateContent", body.toString())
+        val txt = resp.getJSONArray("candidates").getJSONObject(0)
+            .getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
+        onLog("VoiceMatch: " + txt.take(200))
+        val start = txt.indexOf('{')
+        val end = txt.lastIndexOf('}')
+        if (start < 0 || end <= start) throw IOException("Voice match response not JSON: " + txt.take(200))
+        val j = JSONObject(txt.substring(start, end + 1))
+        var voice = j.optString("voice", "Sulafat")
+        val style = j.optString("style", "")
+        if (!voices.contains(voice)) voice = "Sulafat"
+        return Pair(voice, style)
+    }
+
+    fun whisperTranscribe(baseUrl: String, apiKey: String, audio: File): String {
+        val mp = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("model", "whisper-large-v3-turbo")
+            .addFormDataPart("response_format", "text")
+            .addFormDataPart("file", audio.name, audio.asRequestBody("audio/mp4".toMediaType()))
+            .build()
+        val req = Request.Builder()
+            .url(normalizeBase(baseUrl) + "/audio/transcriptions")
+            .header("Authorization", "Bearer " + apiKey)
+            .post(mp)
+            .build()
+        client.newCall(req).execute().use { resp ->
+            val txt = resp.body?.string() ?: ""
+            if (!resp.isSuccessful) throw IOException("HTTP " + resp.code + ": " + txt.take(400))
+            if (txt.isBlank()) throw IOException("Whisper returned empty transcript")
+            return txt.trim()
+        }
+    }
+
+    fun planToJson(plan: RecapPlan, useFrames: Boolean): String {
+        val segs = JSONArray()
+        for (s in plan.segments) {
+            segs.put(JSONObject().put("start", s.startSec).put("end", s.endSec).put("text", s.text))
+        }
+        return JSONObject()
+            .put("title", plan.title)
+            .put("segments", segs)
+            .put("chapters", JSONArray(plan.chapters))
+            .put("quiz", JSONArray(plan.quiz))
+            .put("frames", useFrames)
+            .toString()
+    }
+
+    fun planFromJson(raw: String): Pair<RecapPlan, Boolean> {
+        val j = JSONObject(raw.trim())
+        val segs = ArrayList<Segment>()
+        val arr = j.optJSONArray("segments") ?: JSONArray()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            segs.add(Segment(o.optInt("start", 0), o.optInt("end", 0), o.optString("text", "")))
+        }
+        val chapters = ArrayList<String>()
+        val ch = j.optJSONArray("chapters")
+        if (ch != null) for (i in 0 until ch.length()) chapters.add(ch.optString(i))
+        val quiz = ArrayList<String>()
+        val qz = j.optJSONArray("quiz")
+        if (qz != null) for (i in 0 until qz.length()) quiz.add(qz.optString(i))
+        return Pair(RecapPlan(j.optString("title", "Video Recap"), segs, chapters, quiz), j.optBoolean("frames", true))
     }
 
     fun parsePlan(raw: String): RecapPlan {

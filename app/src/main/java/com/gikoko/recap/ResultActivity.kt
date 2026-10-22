@@ -27,6 +27,9 @@ class ResultActivity : AppCompatActivity() {
     private var srtFile: File? = null
     private var summaryText: String = ""
     private var thumbFile: File? = null
+    private var shortFile: File? = null
+    private var podFile: File? = null
+    private var sourceUrl: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,13 +41,18 @@ class ResultActivity : AppCompatActivity() {
         summaryText = intent.getStringExtra("summary") ?: ""
         val tPath = intent.getStringExtra("thumb") ?: ""
         if (vPath.isEmpty() || !File(vPath).exists()) {
-            Toast.makeText(this, "Video မတွေ့ပါ", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, L.s(this, "Video မတွေ့ပါ", "Video not found"), Toast.LENGTH_LONG).show()
             finish()
             return
         }
         videoFile = File(vPath)
         srtFile = if (sPath.isNotEmpty() && File(sPath).exists()) File(sPath) else null
         thumbFile = if (tPath.isNotEmpty() && File(tPath).exists()) File(tPath) else null
+        val shPath = intent.getStringExtra("short") ?: ""
+        val podPath = intent.getStringExtra("podcast") ?: ""
+        shortFile = if (shPath.isNotEmpty() && File(shPath).exists()) File(shPath) else null
+        podFile = if (podPath.isNotEmpty() && File(podPath).exists()) File(podPath) else null
+        sourceUrl = intent.getStringExtra("source_url") ?: ""
 
         val head = TextView(this)
         head.text = title
@@ -56,7 +64,7 @@ class ResultActivity : AppCompatActivity() {
         root.addView(head)
 
         val ok = TextView(this)
-        ok.text = "Recap အဆင့်သင့်ပါပြီ"
+        ok.text = L.s(this, "Recap အဆင့်သင့်ပါပြီ", "Your recap is ready")
         ok.setTextColor(Color.parseColor("#3DE8F8"))
         ok.textSize = 12f
         ok.gravity = Gravity.CENTER
@@ -89,9 +97,9 @@ class ResultActivity : AppCompatActivity() {
         rp.setMargins(dp(12), dp(12), dp(12), dp(4))
         root.addView(row, rp)
 
-        val save = btn("သိမ်းမည်", R.drawable.bg_gold_btn, "#0A0A00")
+        val save = btn(L.s(this, "သိမ်းမည်", "Save"), R.drawable.bg_gold_btn, "#0A0A00")
         val share = btn("Share Video", R.drawable.bg_chip_selected, "#F2F5FF")
-        val again = btn("အသစ်လုပ်မည်", R.drawable.bg_mode_card, "#C9D2EC")
+        val again = btn(L.s(this, "အသစ်လုပ်မည်", "New recap"), R.drawable.bg_mode_card, "#C9D2EC")
         row.addView(save, btnParams())
         row.addView(share, btnParams())
         row.addView(again, btnParams())
@@ -135,6 +143,27 @@ class ResultActivity : AppCompatActivity() {
             th.setOnClickListener { shareThumb() }
         }
 
+        val row4 = LinearLayout(this)
+        row4.orientation = LinearLayout.HORIZONTAL
+        val rp4 = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        rp4.setMargins(dp(12), dp(4), dp(12), dp(16))
+        root.addView(row4, rp4)
+        if (shortFile != null) {
+            val sh = btn("SHARE SHORTS", R.drawable.bg_chip_selected, "#F2F5FF")
+            row4.addView(sh, btnParams())
+            sh.setOnClickListener { shareShorts() }
+        }
+        if (podFile != null) {
+            val pd = btn("SAVE PODCAST", R.drawable.bg_gold_btn, "#0A0A00")
+            row4.addView(pd, btnParams())
+            pd.setOnClickListener { savePodcast() }
+        }
+        if (sourceUrl.isNotEmpty() && summaryText.contains("CHAPTERS")) {
+            val cl = btn("CHAPTER LINKS", R.drawable.bg_mode_card, "#C9D2EC")
+            row4.addView(cl, btnParams())
+            cl.setOnClickListener { shareChapterLinks() }
+        }
+
         save.setOnClickListener { saveRecap() }
         share.setOnClickListener { shareRecap() }
         again.setOnClickListener {
@@ -164,9 +193,9 @@ class ResultActivity : AppCompatActivity() {
         val okSrt = if (srt != null && srt.exists()) srt else null
         val ok = DownloadsUtil.saveRecap(this, videoFile, okSrt)
         if (ok) {
-            Toast.makeText(this, "Downloads ထဲမှာ သိမ်းပြီးပါပြီ", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, L.s(this, "Downloads ထဲမှာ သိမ်းပြီးပါပြီ", "Saved to Downloads"), Toast.LENGTH_LONG).show()
         } else {
-            Toast.makeText(this, "သိမ်းမအောင်မြင်ပါ", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, L.s(this, "သိမ်းမအောင်မြင်ပါ", "Save failed"), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -217,7 +246,7 @@ class ResultActivity : AppCompatActivity() {
             send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             startActivity(send)
         } catch (e: Exception) {
-            Toast.makeText(this, "App မတွေ့ပါ - share chooser ပွင့်မည်", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, L.s(this, "App မတွေ့ပါ - share chooser ပွင့်မည်", "App not found - share chooser will open"), Toast.LENGTH_SHORT).show()
             shareRecap()
         }
     }
@@ -230,10 +259,64 @@ class ResultActivity : AppCompatActivity() {
             send.type = "image/jpeg"
             send.putExtra(Intent.EXTRA_STREAM, uri)
             send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            startActivity(Intent.createChooser(send, "Thumbnail မျှဝေမည်"))
+            startActivity(Intent.createChooser(send, L.s(this, "Thumbnail မျှဝေမည်", "Share thumbnail")))
         } catch (e: Exception) {
             Toast.makeText(this, "Share failed: " + (e.message ?: ""), Toast.LENGTH_LONG).show()
         }
+    }
+
+    private fun shareShorts() {
+        val f = shortFile ?: return
+        try {
+            val uri = FileProvider.getUriForFile(this, packageName + ".fileprovider", f)
+            val send = Intent(Intent.ACTION_SEND)
+            send.type = "video/mp4"
+            send.putExtra(Intent.EXTRA_STREAM, uri)
+            send.putExtra(Intent.EXTRA_TEXT, "GIKOKO RECAP (AI)")
+            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivity(Intent.createChooser(send, L.s(this, "Shorts မျှဝေမည်", "Share shorts")))
+        } catch (e: Exception) {
+            Toast.makeText(this, "Share failed: " + (e.message ?: ""), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun savePodcast() {
+        val f = podFile ?: return
+        val ok = DownloadsUtil.saveRecap(this, f, null)
+        if (ok) {
+            Toast.makeText(this, L.s(this, "Downloads ထဲမှာ သိမ်းပြီးပါပြီ", "Saved to Downloads"), Toast.LENGTH_LONG).show()
+        } else {
+            Toast.makeText(this, L.s(this, "သိမ်းမအောင်မြင်ပါ", "Save failed"), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun shareChapterLinks() {
+        val sb = StringBuilder()
+        val parts = summaryText.split("CHAPTERS")
+        if (parts.size > 1) {
+            val lines = parts[1].split("\n")
+            for (line in lines) {
+                val t = line.trim()
+                if (t.contains(" — ")) {
+                    val mmss = t.substringBefore(" — ").trim()
+                    val m = Regex("(\\d+):(\\d+)").find(mmss)
+                    if (m != null) {
+                        val sec = m.groupValues[1].toInt() * 60 + m.groupValues[2].toInt()
+                        val joiner = if (sourceUrl.contains("?")) "&" else "?"
+                        sb.append(t.substringAfter(" — ").trim()).append("\n").append(sourceUrl).append(joiner).append("t=").append(sec).append("\n\n")
+                    }
+                }
+            }
+        }
+        if (sb.isEmpty()) {
+            Toast.makeText(this, "Chapters မရှိပါ", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val send = Intent(Intent.ACTION_SEND)
+        send.type = "text/plain"
+        send.putExtra(Intent.EXTRA_SUBJECT, "GIKOKO RECAP - Chapters")
+        send.putExtra(Intent.EXTRA_TEXT, sb.toString().trim())
+        startActivity(Intent.createChooser(send, L.s(this, "Chapter link မျှဝေမည်", "Share chapter links")))
     }
 
     override fun onStart() {

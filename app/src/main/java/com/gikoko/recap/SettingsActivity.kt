@@ -1,5 +1,6 @@
 package com.gikoko.recap
 
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
@@ -20,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.Locale
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -40,6 +42,7 @@ class SettingsActivity : AppCompatActivity() {
     private val geminiModelCards = ArrayList<LinearLayout>()
     private lateinit var extKeyInput: EditText
     private lateinit var extModelInput: EditText
+    private lateinit var usageText: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,6 +50,7 @@ class SettingsActivity : AppCompatActivity() {
         val root = findViewById<LinearLayout>(R.id.rootContainer)
         build(root)
         refreshCacheSize()
+        refreshUsage()
         updateProviderVis()
     }
 
@@ -467,12 +471,140 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
         val noteCT = TextView(this)
-        noteCT.text = "Transcript mode က video ထဲမှာ ပြောတဲ့ စကားသား (caption) ကိုပဲ ဖတ်နိုင်ပါတယ်။ File mode မှာ အလုပ်မလုပ်ပါ။ အသံ (TTS) က Gemini API key နဲ့ ဆက်ထုတ်ပါတယ်။"
+        noteCT.text = "Transcript mode က video ထဲမှာ ပြောတဲ့ စကားသား (caption) ကို ဖတ်ပါတယ်။ File mode မှာ Whisper (Groq) နဲ့ အသံကို ဖတ်ပါတယ်။ အသံ (TTS) က Gemini API key နဲ့ ဆက်ထုတ်ပါတယ်။"
         noteCT.setTextColor(Color.parseColor("#8A93B2"))
         noteCT.textSize = 11f
         noteCT.setPadding(0, dp(8), 0, 0)
         ct.addView(noteCT)
         root.addView(ct)
+
+        val cw = card()
+        cw.addView(sectionTitle("WATERMARK DESIGNER"))
+        val wmPosVals = listOf("tl", "tr", "bl", "br")
+        val wpG = ChipGroup(this)
+        wpG.isSingleSelection = true
+        wpG.isSelectionRequired = true
+        listOf("TOP LEFT", "TOP RIGHT", "BOTTOM LEFT", "BOTTOM RIGHT").forEachIndexed { i, s ->
+            val ch = chipOf(s)
+            ch.id = 42000 + i
+            ch.setOnCheckedChangeListener { _, checked -> if (checked) Prefs.save(this, Prefs.KEY_WM_POS, wmPosVals[i]) }
+            wpG.addView(ch)
+        }
+        val curPosIdx = wmPosVals.indexOf(Prefs.wmPos(this))
+        wpG.check(if (curPosIdx >= 0) 42000 + curPosIdx else 42001)
+        cw.addView(wpG)
+        cw.addView(sectionTitle("LOGO SIZE"))
+        val wmSizeVals = listOf(60, 100, 140, 180)
+        val wsG = ChipGroup(this)
+        wsG.isSingleSelection = true
+        wsG.isSelectionRequired = true
+        listOf("SMALL", "MEDIUM", "LARGE", "XL").forEachIndexed { i, s ->
+            val ch = chipOf(s)
+            ch.id = 42100 + i
+            ch.setOnCheckedChangeListener { _, checked -> if (checked) Prefs.saveInt(this, Prefs.KEY_WM_SIZE, wmSizeVals[i]) }
+            wsG.addView(ch)
+        }
+        val curSizeIdx = wmSizeVals.indexOf(Prefs.wmSize(this))
+        wsG.check(if (curSizeIdx >= 0) 42100 + curSizeIdx else 42101)
+        cw.addView(wsG)
+        val rowW = LinearLayout(this)
+        rowW.orientation = LinearLayout.HORIZONTAL
+        val pickLogo = flatBtn("PICK LOGO", R.drawable.bg_chip_selected, "#F2F5FF")
+        val clearLogo = flatBtn("CLEAR LOGO", R.drawable.bg_mode_card, "#C9D2EC")
+        rowW.addView(pickLogo, btnParams())
+        rowW.addView(clearLogo, btnParams())
+        val rowWP = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        rowWP.topMargin = dp(10)
+        cw.addView(rowW, rowWP)
+        pickLogo.setOnClickListener {
+            startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).setType("image/*"), 77)
+        }
+        clearLogo.setOnClickListener {
+            File(filesDir, "wm_logo.jpg").delete()
+            Prefs.save(this, Prefs.KEY_WM_LOGO, "")
+            Toast.makeText(this, "Logo ဖျက်ပြီးပါပြီ", Toast.LENGTH_SHORT).show()
+        }
+        val wmNote = TextView(this)
+        wmNote.text = "ကိုယ်ပိုင် logo (photo) ရွေးလို့ရတယ် - အရွယ်အစား ပြောင်းလို့ရတယ်။ မရွေးရင် GIkoko text watermark ပဲ ပေါ်မယ်။"
+        wmNote.setTextColor(Color.parseColor("#8A93B2"))
+        wmNote.textSize = 11f
+        wmNote.setPadding(0, dp(8), 0, 0)
+        cw.addView(wmNote)
+        root.addView(cw)
+
+        val cth = card()
+        cth.addView(sectionTitle("INTRO / OUTRO THEME"))
+        val thVals = listOf("gold", "blue", "purple", "green", "red")
+        val thG = ChipGroup(this)
+        thG.isSingleSelection = true
+        thG.isSelectionRequired = true
+        listOf("GOLD", "BLUE", "PURPLE", "GREEN", "RED").forEachIndexed { i, s ->
+            val ch = chipOf(s)
+            ch.id = 42200 + i
+            ch.setOnCheckedChangeListener { _, checked -> if (checked) Prefs.save(this, Prefs.KEY_THEME, thVals[i]) }
+            thG.addView(ch)
+        }
+        val curThemeIdx = thVals.indexOf(Prefs.theme(this))
+        thG.check(if (curThemeIdx >= 0) 42200 + curThemeIdx else 42200)
+        cth.addView(thG)
+        root.addView(cth)
+
+        val capp = card()
+        capp.addView(sectionTitle("APP LANGUAGE - UI"))
+        val uiG = ChipGroup(this)
+        uiG.isSingleSelection = true
+        uiG.isSelectionRequired = true
+        listOf("မြန်မာ", "ENGLISH").forEachIndexed { i, s ->
+            val ch = chipOf(s)
+            ch.id = 42300 + i
+            ch.setOnCheckedChangeListener { _, checked ->
+                if (checked) {
+                    Prefs.save(this, Prefs.KEY_UI_LANG, if (i == 0) "mm" else "en")
+                    recreate()
+                }
+            }
+            uiG.addView(ch)
+        }
+        uiG.check(if (Prefs.uiLang(this) == "en") 42301 else 42300)
+        capp.addView(uiG)
+        val swConfirm = switchRow("Recap မစခင် PLAN တည်းဖြတ်မည် (PLAN EDITOR)", Prefs.KEY_PLAN_CONFIRM, true)
+        val swP = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        swP.topMargin = dp(10)
+        capp.addView(swConfirm, swP)
+        capp.addView(sectionTitle("API USAGE - TODAY"))
+        usageText = TextView(this)
+        usageText.setTextColor(Color.parseColor("#C9D2EC"))
+        usageText.textSize = 13f
+        capp.addView(usageText, swP)
+        val resetU = flatBtn("RESET USAGE", R.drawable.bg_mode_card, "#C9D2EC")
+        capp.addView(resetU, swP)
+        resetU.setOnClickListener {
+            Prefs.resetUsage(this)
+            refreshUsage()
+            Toast.makeText(this, "Reset လုပ်ပြီးပါပြီ", Toast.LENGTH_SHORT).show()
+        }
+        root.addView(capp)
+
+        val cfp = card()
+        cfp.addView(sectionTitle("FEATURE PAGES - STUDIO"))
+        val rowF = LinearLayout(this)
+        rowF.orientation = LinearLayout.HORIZONTAL
+        val fp1 = flatBtn("RECAP STUDIO", R.drawable.bg_gold_btn, "#0A0A00")
+        val fp2 = flatBtn("VOICE LAB", R.drawable.bg_chip_selected, "#F2F5FF")
+        rowF.addView(fp1, btnParams())
+        rowF.addView(fp2, btnParams())
+        val fpP = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        fpP.topMargin = dp(8)
+        cfp.addView(rowF, fpP)
+        fp1.setOnClickListener { startActivity(Intent(this, StudioActivity::class.java)) }
+        fp2.setOnClickListener { startActivity(Intent(this, VoiceLabActivity::class.java)) }
+        val fpNote = TextView(this)
+        fpNote.text = "RECAP STUDIO မှာ Smart length, Auto shorts, Dialogue speaker-2, BGM mix, Podcast export တွေ ရှိတယ်။ VOICE LAB မှာ ကိုယ့်အသံ ဖမ်းပြီး AI နဲ့ မတ်ချာလို့ရတယ်။"
+        fpNote.setTextColor(Color.parseColor("#8A93B2"))
+        fpNote.textSize = 11f
+        fpNote.setPadding(0, dp(8), 0, 0)
+        cfp.addView(fpNote)
+        root.addView(cfp)
 
         val c4 = card()
         c4.addView(sectionTitle("RECAP အချိန် - DEFAULT"))
@@ -576,7 +708,7 @@ class SettingsActivity : AppCompatActivity() {
         val c8 = card()
         c8.addView(sectionTitle("ABOUT"))
         val ab1 = TextView(this)
-        ab1.text = "GIkoko One Recap v2.1.1 (Pro)"
+        ab1.text = "GIKOKO RECAP v0.0.1 (Pro)"
         ab1.setTextColor(Color.parseColor("#FFC940"))
         ab1.textSize = 15f
         ab1.setTypeface(null, Typeface.BOLD)
@@ -592,6 +724,32 @@ class SettingsActivity : AppCompatActivity() {
         val pad = TextView(this)
         val pp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(30))
         root.addView(pad, pp)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 77 && resultCode == -1 && data?.data != null) {
+            runCatching {
+                val dst = File(filesDir, "wm_logo.jpg")
+                contentResolver.openInputStream(data.data!!)?.use { ins ->
+                    dst.outputStream().use { ins.copyTo(it) }
+                }
+                if (dst.length() > 0L) {
+                    Prefs.save(this, Prefs.KEY_WM_LOGO, dst.absolutePath)
+                    Toast.makeText(this, "Logo သိမ်းပြီးပါပြီ", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun refreshUsage() {
+        if (::usageText.isInitialized) usageText.text = Prefs.usageLine(this)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshUsage()
     }
 
     private fun refreshCacheSize() {
