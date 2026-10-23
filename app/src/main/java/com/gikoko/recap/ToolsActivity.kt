@@ -39,6 +39,7 @@ class ToolsActivity : AppCompatActivity() {
     private lateinit var edgeVoiceGroup: ChipGroup
     private lateinit var extKeyInput: EditText
     private lateinit var extModelInput: EditText
+    private lateinit var extBaseInput: EditText
     private lateinit var freeModelStatus: TextView
     private lateinit var freeModelsGroup: ChipGroup
     private lateinit var baseUrlInput: EditText
@@ -373,13 +374,36 @@ class ToolsActivity : AppCompatActivity() {
                 if (checked) {
                     Prefs.save(this, Prefs.KEY_EXT_BASE, presetUrls[i])
                     if (::extModelInput.isInitialized) extModelInput.hint = "model name (ဥပမာ " + presetHints[i] + ")"
+                    if (::extBaseInput.isInitialized) extBaseInput.visibility = View.GONE
                 }
             }
             presetGroup.addView(ch)
         }
+        val chCustom = chipOf("CUSTOM LINK")
+        chCustom.id = 41003
+        chCustom.setOnCheckedChangeListener { _, checked ->
+            if (checked && ::extBaseInput.isInitialized) {
+                extBaseInput.visibility = View.VISIBLE
+                if (extBaseInput.text.toString().trim().isEmpty()) {
+                    Toast.makeText(this, "Custom provider link ရိုက်ထည့်ပြီး SAVE နှိပ်ပါ", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+        presetGroup.addView(chCustom)
         val pIdx = presetUrls.indexOf(Prefs.extBase(this))
-        if (pIdx >= 0) presetGroup.check(41000 + pIdx)
+        if (pIdx >= 0) {
+            presetGroup.check(41000 + pIdx)
+        } else {
+            presetGroup.check(41003)
+        }
         ct.addView(presetGroup, topParams())
+        extBaseInput = EditText(this)
+        extBaseInput.hint = "Custom provider link (ဥပမာ https://api.together.xyz/v1)"
+        inputStyle(extBaseInput)
+        val savedEb = Prefs.extBase(this)
+        if (savedEb.isNotEmpty()) extBaseInput.setText(savedEb)
+        extBaseInput.visibility = if (pIdx >= 0) View.GONE else View.VISIBLE
+        ct.addView(extBaseInput, topParams())
         extKeyInput = EditText(this)
         extKeyInput.hint = "Fallback provider API key"
         inputStyle(extKeyInput)
@@ -400,7 +424,9 @@ class ToolsActivity : AppCompatActivity() {
         val findBtn = flatBtn("🔎 AUTO-FIND FREE MODELS", R.drawable.bg_mode_card, "#C9D2EC")
         ct.addView(findBtn, topParams())
         findBtn.setOnClickListener {
-            val b = Prefs.extBase(this)
+            val bT = extBaseInput.text.toString().trim()
+            val b = if (bT.isNotEmpty()) GeminiClient.normalizeBase(bT) else Prefs.extBase(this)
+            Prefs.save(this, Prefs.KEY_EXT_BASE, b)
             val k = extKeyInput.text.toString().trim()
             Prefs.save(this, Prefs.KEY_EXT_KEY, k)
             freeModelStatus.text = "Free model တွေ ရှာနေသည်..."
@@ -424,12 +450,16 @@ class ToolsActivity : AppCompatActivity() {
         rowCT.addView(saveCT, btnParams())
         rowCT.addView(testCT, btnParams())
         saveCT.setOnClickListener {
+            val eb = extBaseInput.text.toString().trim()
+            if (eb.isNotEmpty()) Prefs.save(this, Prefs.KEY_EXT_BASE, GeminiClient.normalizeBase(eb))
             Prefs.save(this, Prefs.KEY_EXT_KEY, extKeyInput.text.toString().trim())
             Prefs.save(this, Prefs.KEY_EXT_MODEL, extModelInput.text.toString().trim())
             Toast.makeText(this, "သိမ်းပြီးပါပြီ", Toast.LENGTH_SHORT).show()
         }
         testCT.setOnClickListener {
-            val b = Prefs.extBase(this)
+            val bT = extBaseInput.text.toString().trim()
+            val b = if (bT.isNotEmpty()) GeminiClient.normalizeBase(bT) else Prefs.extBase(this)
+            Prefs.save(this, Prefs.KEY_EXT_BASE, b)
             val k = extKeyInput.text.toString().trim()
             if (k.isEmpty()) {
                 Toast.makeText(this, "API key ထည့်ပေးပါ", Toast.LENGTH_LONG).show()

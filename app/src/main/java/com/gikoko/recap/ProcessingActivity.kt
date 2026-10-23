@@ -40,12 +40,27 @@ class ProcessingActivity : AppCompatActivity() {
     private var busy = false
     private var lastProg = 0
     private var startAt = 0L
+    private var lastActivityAt = 0L
+    private var stallWarns = 0
     private val handler = Handler(Looper.getMainLooper())
 
     private val ticker = object : Runnable {
         override fun run() {
             timeText.text = "⏱ " + elapsed()
+            checkStall()
             handler.postDelayed(this, 1000L)
+        }
+    }
+
+    private fun checkStall() {
+        if (!busy || lastActivityAt == 0L) return
+        val idle = (SystemClock.elapsedRealtime() - lastActivityAt) / 1000L
+        if (idle > 150L && stallWarns < 2) {
+            stallWarns = 2
+            addLog("⚠ STALL: " + stepText.text + " - ၂ မိနစ်ခွဲကြာ တုံ့ပြန်မမြင်ပါ။ server ပိတ်နေခြင်း / queue ရှည်ခြင်း / network အားနည်းခြင်း ဖြစ်နိုင်ပါတယ်။ ခဏဆက်စောင့်ပါ၊ ဒါမှမဟုတ် app ပိတ်ပြီး ပြန်စမ်းကြည့်ပါ။")
+        } else if (idle > 45L && stallWarns < 1) {
+            stallWarns = 1
+            addLog("⚠ WAIT: " + stepText.text + " - 45 စက္ကန့်ကြာ တုံ့ပြန်မမြင်ပါ (server busy / queue ဖြစ်နိုင်သည်) - ဆက်စောင့်ဆိုင်းနေသည်...")
         }
     }
 
@@ -75,11 +90,28 @@ class ProcessingActivity : AppCompatActivity() {
     }
 
     private fun addLog(s: String) {
-        logText.append("[" + elapsed() + "] " + s + "\n")
+        lastActivityAt = SystemClock.elapsedRealtime()
+        stallWarns = 0
+        val line = "[" + elapsed() + "] " + s + "\n"
+        if (s.startsWith("ERROR")) {
+            val ss = android.text.SpannableString(line)
+            ss.setSpan(android.text.style.ForegroundColorSpan(Color.parseColor("#FF5C5C")), 0, line.length, 0)
+            logText.append(ss)
+        } else {
+            logText.append(line)
+        }
         logScroll.post { logScroll.fullScroll(View.FOCUS_DOWN) }
     }
 
+    private fun copyLog() {
+        val cm = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        cm.setPrimaryClip(android.content.ClipData.newPlainText("recap_log", logText.text.toString()))
+        android.widget.Toast.makeText(this, L.s(this, "Log ကူးယူပြီး ✓ - ဘယ်နေရာမှာမဆို paste လုပ်လို့ရပါပြီ", "Log copied ✓ - ready to paste"), android.widget.Toast.LENGTH_SHORT).show()
+    }
+
     private fun setProg(p: Int) {
+        lastActivityAt = SystemClock.elapsedRealtime()
+        stallWarns = 0
         if (p < lastProg) return
         lastProg = p
         if (p == 18) {
@@ -94,6 +126,8 @@ class ProcessingActivity : AppCompatActivity() {
     private fun runPipeline() {
         if (busy) return
         busy = true
+        lastActivityAt = SystemClock.elapsedRealtime()
+        stallWarns = 0
         val saved = Prefs.apiKey(this)
         val apiKey = if (saved.isNotEmpty()) saved else (intent.getStringExtra("api_key") ?: "")
         val cfg = RecapConfig(
@@ -343,11 +377,23 @@ class ProcessingActivity : AppCompatActivity() {
         logText.setTextColor(Color.parseColor("#A7B6DC"))
         logText.textSize = 11f
         logText.typeface = Typeface.MONOSPACE
+        logText.setTextIsSelectable(true)
         logText.setPadding(dp(14), dp(12), dp(14), dp(12))
         logScroll.addView(logText)
         val sp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
-        sp.setMargins(dp(16), dp(8), dp(16), dp(16))
+        sp.setMargins(dp(16), dp(8), dp(16), dp(8))
         root.addView(logScroll, sp)
+
+        val copyBtn = android.widget.Button(this)
+        copyBtn.text = L.s(this@ProcessingActivity, "📋 LOG ကူးယူမည်", "📋 COPY LOG")
+        copyBtn.isAllCaps = false
+        copyBtn.textSize = 12f
+        copyBtn.setTextColor(Color.parseColor("#3DE8F8"))
+        copyBtn.setBackgroundResource(R.drawable.bg_chip_selected)
+        copyBtn.setOnClickListener { copyLog() }
+        val cbp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        cbp.setMargins(dp(16), 0, dp(16), dp(16))
+        root.addView(copyBtn, cbp)
     }
 
     private fun dp(v: Int): Int {
