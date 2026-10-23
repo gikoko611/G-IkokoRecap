@@ -25,7 +25,7 @@ class GalleryActivity : AppCompatActivity() {
 
     private data class GItem(val name: String, val uri: Uri?, val path: String?, val size: Long)
 
-    private val prefixes = listOf("AIstudio_", "MERGED_", "BGM_", "TRIM_", "TEXT_", "INTRO_", "SLIDE_", "VO_")
+    private val prefixes = listOf("AIstudio_", "MERGED_", "BGM_", "TRIM_", "TEXT_", "INTRO_", "SLIDE_", "VO_", "COMP_", "SUB_", "PORTRAIT_", "WMADD_")
     private val items = ArrayList<GItem>()
     private lateinit var listBox: LinearLayout
     private lateinit var countText: TextView
@@ -86,7 +86,7 @@ class GalleryActivity : AppCompatActivity() {
         root.addView(listBox)
 
         val n = TextView(this)
-        n.text = "AI STUDIO / MERGER / VIDEO LAB တွေထဲက လုပ်ခဲ့တဲ့ ဖိုင်တွေ (AIstudio_, MERGED_, BGM_, TRIM_, TEXT_, INTRO_, SLIDE_, VO_ နာမည်တွေနဲ့ စတဲ့) ဒီမှာ စုပြပါမယ် - ဖွင့်ကြည့်၊ share၊ ဖျက်လို့ရပါတယ်။"
+        n.text = "AI STUDIO / MERGER / VIDEO LAB တွေထဲက လုပ်ခဲ့တဲ့ ဖိုင်တွေ (AIstudio_, MERGED_, BGM_, TRIM_, TEXT_, INTRO_, SLIDE_, VO_, COMP_, SUB_, PORTRAIT_, WMADD_ နာမည်တွေနဲ့ စတဲ့) ဒီမှာ စုပြပါမယ် - ဖွင့်ကြည့်၊ share၊ ဖျက်လို့ရပါတယ်။"
         n.setTextColor(Color.parseColor("#8A93B2"))
         n.textSize = 11f
         n.setPadding(dp(16), dp(8), dp(16), dp(16))
@@ -150,6 +150,7 @@ class GalleryActivity : AppCompatActivity() {
         return if (name.endsWith(".mp4", true)) "video/mp4"
         else if (name.endsWith(".png", true)) "image/png"
         else if (name.endsWith(".webp", true)) "image/webp"
+        else if (name.endsWith(".wav", true)) "audio/x-wav"
         else "image/jpeg"
     }
 
@@ -175,7 +176,7 @@ class GalleryActivity : AppCompatActivity() {
             titleRow.gravity = Gravity.CENTER_VERTICAL
             card.addView(titleRow)
 
-            val icon = if (gi.name.endsWith(".mp4", true)) "🎬" else "🖼"
+            val icon = if (gi.name.endsWith(".mp4", true)) "🎬" else if (gi.name.endsWith(".wav", true)) "🎵" else "🖼"
             val nm = TextView(this)
             nm.text = icon + " " + gi.name
             nm.textSize = 13f

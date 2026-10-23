@@ -323,6 +323,15 @@ class ToolsActivity : AppCompatActivity() {
         addGridBox(g9, gridBox("🎵", "BGM LIBRARY") { startActivity(Intent(this, BgmLibraryActivity::class.java)) })
         root.addView(g9)
 
+        val g10 = gridRow()
+        addGridBox(g10, gridBox("🎞", "COMPRESS") { startActivity(Intent(this, CompressActivity::class.java)) })
+        addGridBox(g10, gridBox("💬", "SUB BURN") { startActivity(Intent(this, SubtitleBurnActivity::class.java)) })
+        root.addView(g10)
+
+        val g11 = gridRow()
+        addGridBox(g11, gridBox("🖼", "PORTRAIT") { startActivity(Intent(this, PortraitActivity::class.java)) })
+        root.addView(g11)
+
         val ce = card()
         ce.addView(sectionTitle("TTS ENGINE - အသံထုတ် ယန္တရား"))
         val engG = ChipGroup(this)
