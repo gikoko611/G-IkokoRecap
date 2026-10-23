@@ -161,7 +161,7 @@ class GalleryActivity : AppCompatActivity() {
         listBox.removeAllViews()
         countText.text = if (items.isEmpty()) "ဘာမှမရှိသေးပါ - AI STUDIO / MERGER တို့နဲ့ လုပ်ပြီးရင် ဒီမှာ ပေါ်လာမယ်" else ("ဖိုင် " + items.size + " ခု တွေ့ပါသည် (အသစ်က အပေါ်ဆုံး)")
         for (i in items.indices) {
-            val it = items[i]
+            val gi = items[i]
             val card = LinearLayout(this)
             card.orientation = LinearLayout.VERTICAL
             card.setBackgroundResource(R.drawable.bg_card)
@@ -175,9 +175,9 @@ class GalleryActivity : AppCompatActivity() {
             titleRow.gravity = Gravity.CENTER_VERTICAL
             card.addView(titleRow)
 
-            val icon = if (it.name.endsWith(".mp4", true)) "🎬" else "🖼"
+            val icon = if (gi.name.endsWith(".mp4", true)) "🎬" else "🖼"
             val nm = TextView(this)
-            nm.text = icon + " " + it.name
+            nm.text = icon + " " + gi.name
             nm.textSize = 13f
             nm.setTextColor(Color.parseColor("#F2F5FF"))
             nm.setTypeface(null, Typeface.BOLD)
@@ -186,7 +186,7 @@ class GalleryActivity : AppCompatActivity() {
             val np = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             titleRow.addView(nm, np)
             val sz = TextView(this)
-            sz.text = sizeText(it.size)
+            sz.text = sizeText(gi.size)
             sz.textSize = 11f
             sz.setTextColor(Color.parseColor("#8A93B2"))
             titleRow.addView(sz)
@@ -208,7 +208,7 @@ class GalleryActivity : AppCompatActivity() {
             val obp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             obp.marginEnd = dp(4)
             btnRow.addView(openBtn, obp)
-            openBtn.setOnClickListener { openItem(it) }
+            openBtn.setOnClickListener { openItem(gi) }
 
             val shareBtn = TextView(this)
             shareBtn.text = "↗ SHARE"
@@ -220,7 +220,7 @@ class GalleryActivity : AppCompatActivity() {
             val sbp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             sbp.marginEnd = dp(4)
             btnRow.addView(shareBtn, sbp)
-            shareBtn.setOnClickListener { shareItem(it) }
+            shareBtn.setOnClickListener { shareItem(gi) }
 
             val delBtn = TextView(this)
             delBtn.text = "🗑 DEL"
@@ -231,7 +231,7 @@ class GalleryActivity : AppCompatActivity() {
             delBtn.setPadding(dp(8), dp(8), dp(8), dp(8))
             val dbp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             btnRow.addView(delBtn, dbp)
-            delBtn.setOnClickListener { deleteItem(it) }
+            delBtn.setOnClickListener { deleteItem(gi) }
 
             listBox.addView(card)
         }

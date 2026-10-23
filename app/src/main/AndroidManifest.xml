@@ -109,6 +109,11 @@
             android:screenOrientation="portrait" />
 
         <activity
+            android:name=".VideoLabActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
             android:name=".StudioActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
