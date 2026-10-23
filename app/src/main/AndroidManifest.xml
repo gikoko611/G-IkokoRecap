@@ -114,6 +114,21 @@
             android:screenOrientation="portrait" />
 
         <activity
+            android:name=".TextRecapActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
+            android:name=".SlideshowActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
+            android:name=".VoiceOverActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
             android:name=".StudioActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
