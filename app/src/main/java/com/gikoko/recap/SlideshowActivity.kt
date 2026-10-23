@@ -455,16 +455,16 @@ class SlideshowActivity : AppCompatActivity() {
                 progressBar.visibility = View.GONE
                 if (ok) {
                     statusText.text = "ပြီးပါပြီ - Downloads မှာ " + name
-                    Toast.makeText(this, "ပြီးပါပြီ - Downloads မှာ " + name, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@SlideshowActivity, "ပြီးပါပြီ - Downloads မှာ " + name, Toast.LENGTH_SHORT).show()
                 } else {
                     statusText.text = "သိမ်းရာမှာ မအောင်မြင်ပါ"
-                    Toast.makeText(this, "သိမ်းရာမှာ မအောင်မြင်ပါ", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@SlideshowActivity, "သိမ်းရာမှာ မအောင်မြင်ပါ", Toast.LENGTH_LONG).show()
                 }
             } catch (e: Exception) {
                 busy = false
                 progressBar.visibility = View.GONE
                 statusText.text = "မအောင်မြင်: " + (e.message ?: "")
-                Toast.makeText(this, "မအောင်မြင်: " + (e.message ?: ""), Toast.LENGTH_LONG).show()
+                Toast.makeText(this@SlideshowActivity, "မအောင်မြင်: " + (e.message ?: ""), Toast.LENGTH_LONG).show()
             }
         }
     }
