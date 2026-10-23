@@ -58,7 +58,7 @@ jobs:
           name: GIKOKO-RECAP-release
           path: out/GIKOKO-RECAP-release.apk
 
-      - name: Create Release
+      - name: Create or update Release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -67,7 +67,7 @@ jobs:
           gh release create "$TAG" out/GIKOKO-RECAP-release.apk \
             --title "GIKOKO RECAP $TAG" \
             --notes "GIKOKO RECAP 0.0.1: Edge TTS, Tools page, watermark remover, usage tracker, SRT export, thumbnail maker. Myanmar AI voice + captions video recap." \
-            --target "$GITHUB_SHA" || true
+            --target "$GITHUB_SHA" || gh release upload "$TAG" out/GIKOKO-RECAP-release.apk --clobber
 
       - name: Post build log on failure
         if: failure()
