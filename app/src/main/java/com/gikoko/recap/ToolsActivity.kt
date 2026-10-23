@@ -330,6 +330,7 @@ class ToolsActivity : AppCompatActivity() {
 
         val g11 = gridRow()
         addGridBox(g11, gridBox("🖼", "PORTRAIT") { startActivity(Intent(this, PortraitActivity::class.java)) })
+        addGridBox(g11, gridBox("🔥", "WM BURN") { startActivity(Intent(this, WmBurnActivity::class.java)) })
         root.addView(g11)
 
         val ce = card()
