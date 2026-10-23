@@ -29,8 +29,11 @@ import com.gikoko.recap.recap.FrameRenderer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.TimeUnit
 
 class ThumbActivity : AppCompatActivity() {
 
@@ -197,6 +200,11 @@ class ThumbActivity : AppCompatActivity() {
         titleInput.hint = "Thumbnail ခေါင်းစဉ်ရိုက်ပါ"
         inputStyle(titleInput)
         c2.addView(titleInput)
+        val aiBtn = flatBtn("🎨 AI BACKGROUND (KEY မလို)", R.drawable.bg_chip_selected, "#F2F5FF")
+        val aip = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        aip.topMargin = dp(10)
+        c2.addView(aiBtn, aip)
+        aiBtn.setOnClickListener { genAiBackground() }
         c2.addView(sectionTitle("③ THEME"))
         val thG = com.google.android.material.chip.ChipGroup(this)
         thG.isSingleSelection = true
@@ -231,7 +239,7 @@ class ThumbActivity : AppCompatActivity() {
         }
         pg.check(71200 + posIdx)
         c2.addView(pg)
-        val noteT = note("Video ကနေ မန်ချင်းပုံ (frame) ယူပြီး ခေါင်းစဉ် banner ထပ်ဆွဲပေးတာပါ။ Theme ၅ မျိုး၊ အပေါ်/အောက် ရွေးလို့ရပါတယ်။ YouTube / TikTok / Facebook post တွေအတွက် သုံးပါ။")
+        val noteT = note("Video ကနေ မန်ချင်းပုံ (frame) ယူပြီး ခေါင်းစဉ် banner ထပ်ဆွဲပေးတာပါ။ ဒါမှမဟုတ် 🎨 AI BACKGROUND နှိပ်ရင် ခေါင်းစဉ်နဲ့ကိုက်တဲ့ AI ပုံ ကိုယ်တိုင်ဆွဲပေးပါမယ် (API key မလို)။ Theme ၅ မျိုး၊ အပေါ်/အောက် ရွေးလို့ရပါတယ်။ YouTube / TikTok / Facebook post တွေအတွက် သုံးပါ။")
         noteT.setPadding(0, dp(8), 0, 0)
         c2.addView(noteT)
         root.addView(c2)
@@ -293,6 +301,46 @@ class ThumbActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     statusText.text = "မအောင်မြင်: " + (e.message ?: "")
+                }
+            }
+        }
+    }
+
+    private fun genAiBackground() {
+        val title = if (::titleInput.isInitialized) titleInput.text.toString().trim() else ""
+        val base = if (title.isNotEmpty()) title else "cinematic recap background, dark neon city, golden light"
+        val prompt = java.net.URLEncoder.encode(base + ", cinematic, dark background, neon glow, high quality", "UTF-8")
+        val url = "https://image.pollinations.ai/prompt/" + prompt + "?width=1280&height=720&nologo=true&seed=" + (0..999999).random()
+        statusText.text = "AI နောက်ခံပုံဆွဲနေသည်... (၅-၁၀ စက္ကန့်)"
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .readTimeout(180, TimeUnit.SECONDS)
+                    .build()
+                val bytes = client.newCall(Request.Builder().url(url).build()).execute().use { resp ->
+                    if (!resp.isSuccessful) throw IllegalStateException("HTTP " + resp.code)
+                    resp.body!!.bytes()
+                }
+                var bm = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    ?: throw IllegalStateException("AI ပုံ decode မရပါ")
+                if (bm.width > 1920) {
+                    val s = 1920f / bm.width
+                    val sc = Bitmap.createScaledBitmap(bm, 1920, (bm.height * s).toInt(), true)
+                    bm.recycle()
+                    bm = sc
+                }
+                val t = renderThumb(bm)
+                withContext(Dispatchers.Main) {
+                    frameBmp = bm
+                    thumbBmp = t
+                    preview.visibility = View.VISIBLE
+                    preview.setImageBitmap(t)
+                    statusText.text = "AI background အဆင့်သင့် ✓ SAVE / SHARE လုပ်လို့ရပါပြီ"
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    statusText.text = "AI ပုံမရပါ (rate limit ဖြစ်နိုင်): " + (e.message ?: "")
                 }
             }
         }

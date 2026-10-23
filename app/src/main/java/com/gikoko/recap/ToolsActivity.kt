@@ -296,6 +296,7 @@ class ToolsActivity : AppCompatActivity() {
 
         val g4 = gridRow()
         addGridBox(g4, gridBox("🖼", "THUMB MAKER") { startActivity(Intent(this, ThumbActivity::class.java)) })
+        addGridBox(g4, gridBox("🌐", "AI STUDIO") { startActivity(Intent(this, AiStudioActivity::class.java)) })
         root.addView(g4)
 
         val ce = card()
