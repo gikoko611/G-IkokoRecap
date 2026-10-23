@@ -75,8 +75,21 @@ class ProcessingActivity : AppCompatActivity() {
     }
 
     private fun addLog(s: String) {
-        logText.append("[" + elapsed() + "] " + s + "\n")
+        val line = "[" + elapsed() + "] " + s + "\n"
+        if (s.startsWith("ERROR")) {
+            val ss = android.text.SpannableString(line)
+            ss.setSpan(android.text.style.ForegroundColorSpan(Color.parseColor("#FF5C5C")), 0, line.length, 0)
+            logText.append(ss)
+        } else {
+            logText.append(line)
+        }
         logScroll.post { logScroll.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    private fun copyLog() {
+        val cm = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        cm.setPrimaryClip(android.content.ClipData.newPlainText("recap_log", logText.text.toString()))
+        android.widget.Toast.makeText(this, L.s(this, "Log ကူးယူပြီး ✓ - ဘယ်နေရာမှာမဆို paste လုပ်လို့ရပါပြီ", "Log copied ✓ - ready to paste"), android.widget.Toast.LENGTH_SHORT).show()
     }
 
     private fun setProg(p: Int) {
@@ -343,11 +356,23 @@ class ProcessingActivity : AppCompatActivity() {
         logText.setTextColor(Color.parseColor("#A7B6DC"))
         logText.textSize = 11f
         logText.typeface = Typeface.MONOSPACE
+        logText.setTextIsSelectable(true)
         logText.setPadding(dp(14), dp(12), dp(14), dp(12))
         logScroll.addView(logText)
         val sp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
-        sp.setMargins(dp(16), dp(8), dp(16), dp(16))
+        sp.setMargins(dp(16), dp(8), dp(16), dp(8))
         root.addView(logScroll, sp)
+
+        val copyBtn = android.widget.Button(this)
+        copyBtn.text = L.s(this@ProcessingActivity, "📋 LOG ကူးယူမည်", "📋 COPY LOG")
+        copyBtn.isAllCaps = false
+        copyBtn.textSize = 12f
+        copyBtn.setTextColor(Color.parseColor("#3DE8F8"))
+        copyBtn.setBackgroundResource(R.drawable.bg_chip_selected)
+        copyBtn.setOnClickListener { copyLog() }
+        val cbp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        cbp.setMargins(dp(16), 0, dp(16), dp(16))
+        root.addView(copyBtn, cbp)
     }
 
     private fun dp(v: Int): Int {
