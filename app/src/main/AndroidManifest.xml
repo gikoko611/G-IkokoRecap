@@ -94,6 +94,21 @@
             android:screenOrientation="portrait" />
 
         <activity
+            android:name=".PromptBuilderActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
+            android:name=".GalleryActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
+            android:name=".CleanerActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
             android:name=".StudioActivity"
             android:exported="false"
             android:screenOrientation="portrait" />

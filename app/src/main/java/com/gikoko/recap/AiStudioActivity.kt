@@ -1,5 +1,6 @@
 package com.gikoko.recap
 
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
@@ -68,6 +69,19 @@ class AiStudioActivity : AppCompatActivity() {
         n.textSize = 11f
         n.setPadding(dp(16), 0, dp(16), dp(8))
         root.addView(n)
+
+        val builderBtn = android.widget.Button(this)
+        builderBtn.text = "🛠 PROMPT BUILDER PRO - ချိန်းကြည့်ရုံ Prompt ရ"
+        builderBtn.isAllCaps = false
+        builderBtn.textSize = 13f
+        builderBtn.setTextColor(Color.parseColor("#0A0A00"))
+        builderBtn.setTypeface(null, Typeface.BOLD)
+        builderBtn.setBackgroundResource(R.drawable.bg_gold_btn)
+        builderBtn.setPadding(dp(8), dp(12), dp(8), dp(12))
+        val bbp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        bbp.setMargins(dp(12), dp(6), dp(12), dp(2))
+        root.addView(builderBtn, bbp)
+        builderBtn.setOnClickListener { startActivity(Intent(this@AiStudioActivity, PromptBuilderActivity::class.java)) }
 
         val pt = TextView(this)
         pt.text = "💡 PROMPT IDEAS - ဘယ်လိုရေးရမသိရင် အောက်ကနေ ရွေးပါ"

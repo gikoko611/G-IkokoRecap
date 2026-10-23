@@ -304,6 +304,11 @@ class ToolsActivity : AppCompatActivity() {
         addGridBox(g5, gridBox("🎞", "MERGER") { startActivity(Intent(this, MergeActivity::class.java)) })
         root.addView(g5)
 
+        val g6 = gridRow()
+        addGridBox(g6, gridBox("🖼", "GALLERY") { startActivity(Intent(this, GalleryActivity::class.java)) })
+        addGridBox(g6, gridBox("🧹", "CLEANER") { startActivity(Intent(this, CleanerActivity::class.java)) })
+        root.addView(g6)
+
         val ce = card()
         ce.addView(sectionTitle("TTS ENGINE - အသံထုတ် ယန္တရား"))
         val engG = ChipGroup(this)
