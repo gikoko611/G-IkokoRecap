@@ -63,10 +63,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v2.0.$GITHUB_RUN_NUMBER"
+          TAG="v0.0.1"
           gh release create "$TAG" out/GIKOKO-RECAP-release.apk \
-            --title "GIKOKO RECAP $TAG (Pro, Signed)" \
-            --notes "Pro v2.0: Settings, History, Drawer, 20+ features. Myanmar AI voice + captions video recap." \
+            --title "GIKOKO RECAP $TAG" \
+            --notes "GIKOKO RECAP 0.0.1: Edge TTS, Tools page, watermark remover, usage tracker, SRT export, thumbnail maker. Myanmar AI voice + captions video recap." \
             --target "$GITHUB_SHA" || true
 
       - name: Post build log on failure

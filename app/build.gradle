@@ -12,7 +12,7 @@ android {
         minSdk 24
         targetSdk 34
         versionCode 15
-        versionName '2.0'
+        versionName '0.0.1'
     }
 
     def ksFile = file('ci.keystore')
@@ -63,4 +63,3 @@ dependencies {
     implementation 'androidx.media3:media3-exoplayer:1.4.1'
     implementation 'androidx.media3:media3-ui:1.4.1'
 }
-
