@@ -79,11 +79,9 @@ object GeminiClient {
     }
 
     fun listCustomModels(baseUrl: String, apiKey: String): ArrayList<String> {
-        val req = Request.Builder()
-            .url(normalizeBase(baseUrl) + "/models")
-            .header("Authorization", "Bearer " + apiKey)
-            .get()
-            .build()
+        val builder = Request.Builder().url(normalizeBase(baseUrl) + "/models").get()
+        if (apiKey.isNotEmpty()) builder.header("Authorization", "Bearer " + apiKey)
+        val req = builder.build()
         client.newCall(req).execute().use { resp ->
             val txt = resp.body?.string() ?: ""
             if (!resp.isSuccessful) throw IOException("HTTP " + resp.code + ": " + txt.take(600))

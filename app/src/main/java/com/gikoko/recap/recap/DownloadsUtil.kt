@@ -53,4 +53,31 @@ object DownloadsUtil {
             return false
         }
     }
+
+    fun saveFile(context: Context, src: File, displayName: String, mime: String): Boolean {
+        try {
+            if (Build.VERSION.SDK_INT >= 29) {
+                val resolver = context.contentResolver
+                val values = ContentValues()
+                values.put(MediaStore.Downloads.DISPLAY_NAME, displayName)
+                values.put(MediaStore.Downloads.MIME_TYPE, mime)
+                values.put(MediaStore.Downloads.IS_PENDING, 1)
+                val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                    ?: return false
+                val out = resolver.openOutputStream(uri) ?: return false
+                out.use { o -> src.inputStream().use { it.copyTo(o) } }
+                values.clear()
+                values.put(MediaStore.Downloads.IS_PENDING, 0)
+                resolver.update(uri, values, null, null)
+                return true
+            } else {
+                val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                dir.mkdirs()
+                src.copyTo(File(dir, displayName), overwrite = true)
+                return true
+            }
+        } catch (e: Exception) {
+            return false
+        }
+    }
 }

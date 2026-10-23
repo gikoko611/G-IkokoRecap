@@ -25,6 +25,7 @@ import androidx.appcompat.widget.SwitchCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.lifecycleScope
 import com.gikoko.recap.net.GeminiClient
+import com.gikoko.recap.net.Tts
 import com.gikoko.recap.recap.WavUtil
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
@@ -190,6 +191,10 @@ class HomeActivity : AppCompatActivity() {
             drawer.closeDrawer(Gravity.START)
             startActivity(Intent(this, SettingsActivity::class.java))
         })
+        panel.addView(menuItem("🛠  Tools") {
+            drawer.closeDrawer(Gravity.START)
+            startActivity(Intent(this, ToolsActivity::class.java))
+        })
         panel.addView(menuItem("🕘  History") {
             drawer.closeDrawer(Gravity.START)
             startActivity(Intent(this, HistoryActivity::class.java))
@@ -305,7 +310,7 @@ class HomeActivity : AppCompatActivity() {
             statusCard.addView(warn)
 
             val note = TextView(this)
-            note.text = "အသံ (TTS) ထုတ်ဖို့ Gemini key လိုပါတယ်။ Settings မှာ ထည့်ပေးပါ။"
+            note.text = "အသံ (TTS) ထုတ်ဖို့ Gemini key လိုပါတယ်။ Settings မှာ ထည့်ပေးပါ။ (သို့) Tools → TTS ENGINE → Edge TTS (Free) - key မလိုပါ။"
             note.setTextColor(Color.parseColor("#8A93B2"))
             note.textSize = 12f
             note.setPadding(0, dp(6), 0, dp(10))
@@ -330,7 +335,7 @@ class HomeActivity : AppCompatActivity() {
             statusCard.addView(ok)
 
             val info = TextView(this)
-            info.text = "Free model: " + Prefs.customModel(this) + "  \u2022  အသံ (TTS): Gemini key ✓"
+            info.text = "Free model: " + Prefs.customModel(this) + "  \u2022  အသံ (TTS): " + (if (Prefs.ttsEngine(this) == "edge") "Edge TTS (Free) ✓" else "Gemini key ✓")
             info.setTextColor(Color.parseColor("#8A93B2"))
             info.textSize = 11f
             info.setPadding(0, dp(6), 0, 0)
@@ -628,8 +633,8 @@ class HomeActivity : AppCompatActivity() {
 
         start.setOnClickListener {
             val key = Prefs.apiKey(this)
-            if (key.isEmpty()) {
-                Toast.makeText(this, L.s(this@HomeActivity, "အသံ (TTS) အတွက် Gemini API key လိုပါတယ် - Settings မှာ ထည့်ပါ", "Gemini API key needed for voice (TTS) - add it in Settings"), Toast.LENGTH_LONG).show()
+            if (key.isEmpty() && !(Prefs.provider(this) == "custom" && Prefs.ttsEngine(this) == "edge")) {
+                Toast.makeText(this, L.s(this@HomeActivity, "Gemini API key လိုပါတယ် - Settings မှာ ထည့်ပါ (သို့) Tools → TTS ENGINE → Edge TTS + Custom provider သုံးပါ", "Add your Gemini API key in Settings (or use Edge TTS + Custom provider in Tools)"), Toast.LENGTH_LONG).show()
                 startActivity(Intent(this, SettingsActivity::class.java))
                 return@setOnClickListener
             }
@@ -675,8 +680,8 @@ class HomeActivity : AppCompatActivity() {
 
     private fun previewVoice() {
         val key = Prefs.apiKey(this)
-        if (key.isEmpty()) {
-            Toast.makeText(this, L.s(this@HomeActivity, "Settings မှာ Gemini API key ထည့်ပေးပါ", "Add your Gemini API key in Settings"), Toast.LENGTH_LONG).show()
+        if (key.isEmpty() && Prefs.ttsEngine(this) != "edge") {
+            Toast.makeText(this, L.s(this@HomeActivity, "Settings မှာ Gemini API key ထည့်ပေးပါ (သို့) Tools → TTS ENGINE → Edge TTS (Free) သုံးပါ", "Add your Gemini API key in Settings (or use Edge TTS in Tools)"), Toast.LENGTH_LONG).show()
             return
         }
         val v = selectedVoice()
@@ -684,7 +689,7 @@ class HomeActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val (pcm, rate) = withContext(Dispatchers.IO) {
-                    GeminiClient.generateTts(key, "GIkoko One Recap မှ ကြိုဆိုပါတယ်။ ဒီက သင်ရွေးထားတဲ့ အသံပါ။", v, Prefs.speed(this@HomeActivity))
+                    Tts.generate(this@HomeActivity, key, "GIkoko One Recap မှ ကြိုဆိုပါတယ်။ ဒီက သင်ရွေးထားတဲ့ အသံပါ။", v, Prefs.speed(this@HomeActivity))
                 }
                 val wav = WavUtil.pcmToWav(pcm, rate)
                 val f = File(cacheDir, "voice_preview.wav")
