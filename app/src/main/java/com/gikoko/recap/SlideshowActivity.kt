@@ -30,7 +30,7 @@ import androidx.media3.transformer.Effects
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
-import com.gikoko.recap.recap.DownsloadsUtil
+import com.gikoko.recap.recap.DownloadsUtil
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.common.collect.ImmutableList
@@ -225,6 +225,11 @@ class SlideshowActivity : AppCompatActivity() {
             i.setType("audio/*")
             startActivityForResult(i, 91)
         }
+        val pickLib = flatBtn("🎵 LIBRARY မှ ရွေးမည်", R.drawable.bg_chip_selected, "#F2F5FF")
+        cb.addView(pickLib, topParams())
+        pickLib.setOnClickListener {
+            startActivityForResult(Intent(this, BgmLibraryActivity::class.java).putExtra("pick", true), 92)
+        }
         audioNameText = note("Audio မရွေးရသေးပါ - မရွေးရင် အသံမပါတဲ့ slideshow ဖြစ်မယ်")
         audioNameText.setPadding(0, dp(8), 0, 0)
         cb.addView(audioNameText)
@@ -273,6 +278,15 @@ class SlideshowActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode != -1 || data == null) return
+        if (requestCode == 92) {
+            val p = data.getStringExtra("path")
+            if (p != null) {
+                audioFile = File(p)
+                audioNameText.text = "BGM audio ရွေးပြီးပါပြီ ✓ - LIBRARY: " + File(p).name
+                Toast.makeText(this, "Library BGM ရွေးပြီးပါပြီ ✓", Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
         if (requestCode == 90) {
             val work = File(cacheDir, "slides")
             work.mkdirs()

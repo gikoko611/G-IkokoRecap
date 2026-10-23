@@ -313,6 +313,16 @@ class ToolsActivity : AppCompatActivity() {
         addGridBox(g7, gridBox("🎬", "VIDEO LAB") { startActivity(Intent(this, VideoLabActivity::class.java)) })
         root.addView(g7)
 
+        val g8 = gridRow()
+        addGridBox(g8, gridBox("📄", "TEXT RECAP") { startActivity(Intent(this, TextRecapActivity::class.java)) })
+        addGridBox(g8, gridBox("🖼", "SLIDESHOW") { startActivity(Intent(this, SlideshowActivity::class.java)) })
+        root.addView(g8)
+
+        val g9 = gridRow()
+        addGridBox(g9, gridBox("🗣", "VOICE-OVER") { startActivity(Intent(this, VoiceOverActivity::class.java)) })
+        addGridBox(g9, gridBox("🎵", "BGM LIBRARY") { startActivity(Intent(this, BgmLibraryActivity::class.java)) })
+        root.addView(g9)
+
         val ce = card()
         ce.addView(sectionTitle("TTS ENGINE - အသံထုတ် ယန္တရား"))
         val engG = ChipGroup(this)

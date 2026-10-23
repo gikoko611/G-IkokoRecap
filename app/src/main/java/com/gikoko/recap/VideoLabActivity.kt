@@ -221,6 +221,11 @@ class VideoLabActivity : AppCompatActivity() {
         val pickA = flatBtn("🎵 BGM AUDIO ရွေးမည်", R.drawable.bg_chip_selected, "#F2F5FF")
         cb.addView(pickA)
         pickA.setOnClickListener { pickAudio() }
+        val pickLib = flatBtn("🎵 LIBRARY မှ ရွေးမည်", R.drawable.bg_chip_selected, "#F2F5FF")
+        cb.addView(pickLib, topParams())
+        pickLib.setOnClickListener {
+            startActivityForResult(Intent(this, BgmLibraryActivity::class.java).putExtra("pick", true), 92)
+        }
         audioNameText = note("Audio မရွေးရသေးပါ")
         audioNameText.setPadding(0, dp(8), 0, 0)
         cb.addView(audioNameText)
@@ -342,7 +347,17 @@ class VideoLabActivity : AppCompatActivity() {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode != -1 || data?.data == null) return
+        if (resultCode != -1 || data == null) return
+        if (requestCode == 92) {
+            val p = data.getStringExtra("path")
+            if (p != null) {
+                audioFile = File(p)
+                audioNameText.text = "BGM audio ရွေးပြီးပါပြီ ✓ - LIBRARY: " + File(p).name
+                Toast.makeText(this, "Library BGM ရွေးပြီးပါပြီ ✓", Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
+        if (data.data == null) return
         val uri = data.data!!
         val work = File(cacheDir, "videolab")
         work.mkdirs()
