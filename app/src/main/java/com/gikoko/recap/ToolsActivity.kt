@@ -301,6 +301,7 @@ class ToolsActivity : AppCompatActivity() {
 
         val g5 = gridRow()
         addGridBox(g5, gridBox("🎬", "VIDEO QUEUE") { startActivity(Intent(this, QueueActivity::class.java)) })
+        addGridBox(g5, gridBox("🎞", "MERGER") { startActivity(Intent(this, MergeActivity::class.java)) })
         root.addView(g5)
 
         val ce = card()
