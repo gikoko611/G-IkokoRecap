@@ -68,7 +68,8 @@ data class RecapConfig(
     val voice2: String = "Kore",
     val bgmOn: Boolean = false,
     val bgmPath: String = "",
-    val bgmVol: Double = 0.2
+    val bgmVol: Double = 0.2,
+    val seriesCtx: String = ""
 )
 
 data class RecapOutput(val video: File, val srt: File, val title: String, val summary: String, val shorts: File? = null, val podcast: File? = null)
@@ -386,10 +387,15 @@ object RecapPipeline {
     }
 
     private fun styleIn(cfg: RecapConfig): String {
-        if (!cfg.dialogue) return cfg.customStyle
-        val base = cfg.customStyle.trim()
-        val d = "Write the recap as a lively two-person dialogue: HOST and GUEST take turns, one speaker per segment, alternating."
-        return if (base.isEmpty()) d else base + " " + d
+        var base = cfg.customStyle.trim()
+        if (cfg.dialogue) {
+            val d = "Write the recap as a lively two-person dialogue: HOST and GUEST take turns, one speaker per segment, alternating."
+            base = if (base.isEmpty()) d else base + " " + d
+        }
+        if (cfg.seriesCtx.isNotEmpty()) {
+            base += " This recap is a CONTINUING PART of a video series (the next part). The previous part ended with: << " + cfg.seriesCtx + " >>. In the FIRST segment, briefly connect to that ending in one or two short sentences (recap of the previous part), then continue the story naturally. Keep the same narrator style and language."
+        }
+        return base
     }
 
     private fun tryTranscriptFallback(context: Context, e: Exception, cfg: RecapConfig, url: String, onLog: (String) -> Unit): RecapPlan {

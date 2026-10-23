@@ -128,6 +128,18 @@ class ProcessingActivity : AppCompatActivity() {
         busy = true
         lastActivityAt = SystemClock.elapsedRealtime()
         stallWarns = 0
+        val queueMode = intent.hasExtra("queue")
+        val queuePaths = ArrayList<String>()
+        if (queueMode) {
+            try {
+                val qArr = org.json.JSONArray(intent.getStringExtra("queue") ?: "[]")
+                for (i in 0 until qArr.length()) queuePaths.add(qArr.getString(i))
+            } catch (e: Exception) {
+            }
+        }
+        val queueIdx = intent.getIntExtra("queue_idx", 0)
+        val queueSeries = intent.getBooleanExtra("queue_series", false)
+        val prevSummary = intent.getStringExtra("prev_summary") ?: ""
         val saved = Prefs.apiKey(this)
         val apiKey = if (saved.isNotEmpty()) saved else (intent.getStringExtra("api_key") ?: "")
         val cfg = RecapConfig(
@@ -158,14 +170,15 @@ class ProcessingActivity : AppCompatActivity() {
             Prefs.wmPos(this),
             Prefs.wmLogo(this),
             Prefs.theme(this),
-            Prefs.planConfirm(this),
+            if (queueMode) false else Prefs.planConfirm(this),
             Prefs.shorts(this),
             Prefs.podcast(this),
             Prefs.dialogue(this),
             Prefs.voice2(this),
             Prefs.bgmOn(this),
             Prefs.bgmPath(this),
-            Prefs.bgmVol(this).toDouble()
+            Prefs.bgmVol(this).toDouble(),
+            if (queueMode && queueSeries) prevSummary else ""
         )
         val source = intent.getStringExtra("source") ?: "youtube"
         val url = intent.getStringExtra("url") ?: ""
@@ -174,6 +187,11 @@ class ProcessingActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 addLog("Engine start - provider: " + cfg.provider + ", model: " + if (cfg.provider == "custom") cfg.customModel else cfg.model)
+                if (queueMode) {
+                    addLog("QUEUE mode: item " + (queueIdx + 1) + "/" + queuePaths.size + (if (queueSeries) " [SERIES LINK]" else ""))
+                    if (queueSeries && prevSummary.isNotEmpty()) addLog("SERIES: အရင်ပိုင်းအဆုံးကို ချိတ်ဆက်ပြောပါမယ်")
+                    if (Prefs.planConfirm(this@ProcessingActivity)) addLog("PLAN EDITOR - QUEUE mode မှာ ခဏ ပိတ်ထားပါမယ်")
+                }
                 val out: RecapOutput
                 if (planPath.isNotEmpty() && File(planPath).exists()) {
                     addLog("Confirmed plan loaded - rendering...")
@@ -286,13 +304,33 @@ class ProcessingActivity : AppCompatActivity() {
                     v
                 }
                 addLog("Archive saved - " + archiveVideo.name)
-                if (Prefs.autosave(this@ProcessingActivity)) {
+                if (Prefs.autosave(this@ProcessingActivity) || queueMode) {
                     withContext(Dispatchers.IO) {
                         DownloadsUtil.saveRecap(this@ProcessingActivity, archiveVideo, out.srt)
                     }
                     addLog("Download folder ထဲ auto-save ✓")
                 }
                 setProg(100)
+                if (queueMode && queueIdx + 1 < queuePaths.size) {
+                    addLog("✅ QUEUE item " + (queueIdx + 1) + "/" + queuePaths.size + " ပြီးပါပြီ - နောက် video ကို ဆက်လုပ်နေသည်...")
+                    val ni = Intent(this@ProcessingActivity, ProcessingActivity::class.java)
+                    ni.putExtra("source", "file")
+                    ni.putExtra("path", queuePaths[queueIdx + 1])
+                    ni.putExtra("queue", intent.getStringExtra("queue"))
+                    ni.putExtra("queue_idx", queueIdx + 1)
+                    ni.putExtra("queue_series", queueSeries)
+                    if (queueSeries) {
+                        var ps = out.summary
+                        val cIdx = ps.indexOf("\n\nCHAPTERS")
+                        if (cIdx > 0) ps = ps.substring(0, cIdx)
+                        if (ps.length > 700) ps = ps.substring(ps.length - 700)
+                        ni.putExtra("prev_summary", ps)
+                    }
+                    startActivity(ni)
+                    finish()
+                    return@launch
+                }
+                if (queueMode) addLog("QUEUE အားလုံး ပြီးပါပြီ ✓ (" + queuePaths.size + " videos)")
                 addLog("Done - result screen ပွင့်နေသည် ✓")
                 val i = Intent(this@ProcessingActivity, ResultActivity::class.java)
                 i.putExtra("video", archiveVideo.absolutePath)
@@ -312,19 +350,32 @@ class ProcessingActivity : AppCompatActivity() {
                 runOnUiThread {
                     addLog("ERROR: " + msg)
                     stepText.text = L.s(this@ProcessingActivity, "မအောင်မြင်ပါ", "Failed")
-                    AlertDialog.Builder(this@ProcessingActivity)
+                    val db = AlertDialog.Builder(this@ProcessingActivity)
                         .setTitle(L.s(this@ProcessingActivity, "Recap မအောင်မြင်ပါ", "Recap failed"))
                         .setMessage(msg)
-                        .setPositiveButton(L.s(this@ProcessingActivity, "ပြန်သွားမည်", "Go back")) { d, _ -> finish() }
-                        .setNeutralButton(L.s(this@ProcessingActivity, "ထပ်စမ်းမည်", "Retry")) { d, _ ->
-                            busy = false
-                            lastProg = 0
-                            bar.setProgress(0)
-                            addLog("--- retry ---")
-                            runPipeline()
+                    if (queueMode && queueIdx + 1 < queuePaths.size) {
+                        db.setPositiveButton(L.s(this@ProcessingActivity, "ဒီချက်ကို ကျော်ပြီး နောက်ချက် ဆက်လုပ်မည်", "Skip to next video")) { d, _ ->
+                            val ni = Intent(this@ProcessingActivity, ProcessingActivity::class.java)
+                            ni.putExtra("source", "file")
+                            ni.putExtra("path", queuePaths[queueIdx + 1])
+                            ni.putExtra("queue", intent.getStringExtra("queue"))
+                            ni.putExtra("queue_idx", queueIdx + 1)
+                            ni.putExtra("queue_series", queueSeries)
+                            startActivity(ni)
+                            finish()
                         }
-                        .setNegativeButton(L.s(this@ProcessingActivity, "အသေးစိတ်ကြည့်မည်", "See details")) { d, _ -> d.dismiss() }
-                        .show()
+                    } else {
+                        db.setPositiveButton(L.s(this@ProcessingActivity, "ပြန်သွားမည်", "Go back")) { d, _ -> finish() }
+                    }
+                    db.setNeutralButton(L.s(this@ProcessingActivity, "ထပ်စမ်းမည်", "Retry")) { d, _ ->
+                        busy = false
+                        lastProg = 0
+                        bar.setProgress(0)
+                        addLog("--- retry ---")
+                        runPipeline()
+                    }
+                    db.setNegativeButton(L.s(this@ProcessingActivity, "အသေးစိတ်ကြည့်မည်", "See details")) { d, _ -> d.dismiss() }
+                    db.show()
                 }
             }
         }
