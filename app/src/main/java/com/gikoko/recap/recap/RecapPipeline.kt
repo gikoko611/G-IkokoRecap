@@ -117,9 +117,9 @@ object RecapPipeline {
             withContext(Dispatchers.Main) { extractAudio(context, srcFile, audio) }
             Prefs.bumpUsage(context, Prefs.KEY_U_ASR, 1)
             onLog("Whisper ASR: " + cfg.extModel)
-            val t = GeminiClient.whisperTranscribe(cfg.extBase, cfg.extKey, audio)
+            val t = withContext(Dispatchers.IO) { GeminiClient.whisperTranscribe(cfg.extBase, cfg.extKey, audio) }
             onLog("Transcript ready: " + t.length + " chars - plan ဆွဲနေသည်")
-            val plan = GeminiClient.generatePlanTranscript(cfg.extBase, cfg.extKey, cfg.extModel, t, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, styleIn(cfg), onLog)
+            val plan = withContext(Dispatchers.IO) { GeminiClient.generatePlanTranscript(cfg.extBase, cfg.extKey, cfg.extModel, t, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, styleIn(cfg), onLog) }
             Prefs.bumpUsage(context, Prefs.KEY_U_EXT, 1)
             onProgress(45)
             return Pair(plan, true)
