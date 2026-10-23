@@ -64,7 +64,7 @@ class AiStudioActivity : AppCompatActivity() {
         root.addView(statusText)
 
         val n = TextView(this)
-        n.text = "zsky.ai ရဲ့ unlimited free tier — image / video ဆွဲလို့ရပါတယ် (API key မလိုပါ)။ ပုံ (ဒါမှမဟုတ် video) ဆွဲပြီး download နှိပ်ရင် app က Downloads ထဲ သိမ်းပေးပါမယ်။ ဒါက zsky ရဲ့ website ကို app ထဲမှာ ဖွင့်ပြတာပါ — site လိုအပ်ချက်အရ တခါတရံ နှေးနိုင်ပါတယ်။"
+        n.text = "zsky.ai ရဲ့ unlimited free tier — image / video ဆွဲလို့ရပါတယ် (API key မလိုပါ)။ ပုံ (ဒါမှမဟုတ် video) ဆွဲပြီး download နှိပ်ရင် အရင် PREVIEW ပြပါမယ် - DOWNLOAD နှိပ်မှ Downloads ထဲ သိမ်းပေးပါမယ်။ ဒါက zsky ရဲ့ website ကို app ထဲမှာ ဖွင့်ပြတာပါ — site လိုအပ်ချက်အရ တခါတရံ နှေးနိုင်ပါတယ်။"
         n.setTextColor(Color.parseColor("#8A93B2"))
         n.textSize = 11f
         n.setPadding(dp(16), 0, dp(16), dp(8))
@@ -82,6 +82,19 @@ class AiStudioActivity : AppCompatActivity() {
         bbp.setMargins(dp(12), dp(6), dp(12), dp(2))
         root.addView(builderBtn, bbp)
         builderBtn.setOnClickListener { startActivity(Intent(this@AiStudioActivity, PromptBuilderActivity::class.java)) }
+
+        val wmBtn = android.widget.Button(this)
+        wmBtn.text = "🔥 WM BURN - watermark / logo / စာ ထည့်မည်"
+        wmBtn.isAllCaps = false
+        wmBtn.textSize = 13f
+        wmBtn.setTextColor(Color.parseColor("#0A0A00"))
+        wmBtn.setTypeface(null, Typeface.BOLD)
+        wmBtn.setBackgroundResource(R.drawable.bg_gold_btn)
+        wmBtn.setPadding(dp(8), dp(12), dp(8), dp(12))
+        val wbp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        wbp.setMargins(dp(12), dp(2), dp(12), dp(2))
+        root.addView(wmBtn, wbp)
+        wmBtn.setOnClickListener { startActivity(Intent(this@AiStudioActivity, WmBurnActivity::class.java)) }
 
         val pt = TextView(this)
         pt.text = "💡 PROMPT IDEAS - ဘယ်လိုရေးရမသိရင် အောက်ကနေ ရွေးပါ"
@@ -168,19 +181,67 @@ class AiStudioActivity : AppCompatActivity() {
                     }
                     tmp
                 }
-                val ok = withContext(Dispatchers.IO) {
-                    DownloadsUtil.saveFile(this@AiStudioActivity, f, name, outMime)
-                }
-                if (ok) {
-                    statusText.text = "သိမ်းပြီးပါပြီ ✓ " + name + " (Downloads)"
-                    Toast.makeText(this@AiStudioActivity, "Downloads ထဲမှာ သိမ်းပြီးပါပြီ ✓", Toast.LENGTH_LONG).show()
-                } else {
-                    statusText.text = "သိမ်းမှု မအောင်မြင်ပါ"
-                }
+                statusText.text = "Preview ပြနေသည် - ကြည့်ပြီးမှ ဆုံးဖြတ်ပါ"
+                showPreview(f, isVideo, name, outMime)
             } catch (e: Exception) {
                 statusText.text = "Download မအောင်မြင်: " + (e.message ?: "")
             }
         }
+    }
+
+    private fun showPreview(f: File, isVideo: Boolean, name: String, outMime: String) {
+        val wrap = LinearLayout(this)
+        wrap.orientation = LinearLayout.VERTICAL
+        if (isVideo) {
+            val vv = android.widget.VideoView(this)
+            vv.setVideoPath(f.absolutePath)
+            vv.setOnPreparedListener { mp -> mp.isLooping = true }
+            val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(220))
+            wrap.addView(vv, lp)
+            vv.start()
+        } else {
+            val iv = android.widget.ImageView(this)
+            iv.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            val o1 = android.graphics.BitmapFactory.Options()
+            o1.inJustDecodeBounds = true
+            android.graphics.BitmapFactory.decodeFile(f.absolutePath, o1)
+            var sample = 1
+            while (o1.outWidth / (sample * 2) >= 1080 || o1.outHeight / (sample * 2) >= 1080) sample *= 2
+            val o2 = android.graphics.BitmapFactory.Options()
+            o2.inSampleSize = sample
+            val bmp = android.graphics.BitmapFactory.decodeFile(f.absolutePath, o2)
+            val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(320))
+            wrap.addView(iv, lp)
+            if (bmp != null) iv.setImageBitmap(bmp)
+        }
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("👀 PREVIEW")
+            .setView(wrap)
+            .setPositiveButton("⬇ DOWNLOAD") { _, _ ->
+                lifecycleScope.launch {
+                    try {
+                        val ok = withContext(Dispatchers.IO) {
+                            DownloadsUtil.saveFile(this@AiStudioActivity, f, name, outMime)
+                        }
+                        if (ok) {
+                            statusText.text = "သိမ်းပြီးပါပြီ ✓ " + name + " (Downloads)"
+                            Toast.makeText(this@AiStudioActivity, "Downloads ထဲမှာ သိမ်းပြီးပါပြီ ✓", Toast.LENGTH_LONG).show()
+                        } else {
+                            statusText.text = "သိမ်းမှု မအောင်မြင်ပါ"
+                            f.delete()
+                        }
+                    } catch (e: Exception) {
+                        statusText.text = "သိမ်းမှု မအောင်မြင်: " + (e.message ?: "")
+                        f.delete()
+                    }
+                }
+            }
+            .setNegativeButton("✕ မယူဘူး") { _, _ ->
+                f.delete()
+                statusText.text = "မယူပါ - file ဖျက်ပြီးပါပြီ"
+            }
+            .setOnCancelListener { f.delete() }
+            .show()
     }
 
     private val promptIdeas = linkedMapOf(

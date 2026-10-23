@@ -184,6 +184,7 @@ class ProcessingActivity : AppCompatActivity() {
         val url = intent.getStringExtra("url") ?: ""
         val path = intent.getStringExtra("path") ?: ""
         val planPath = intent.getStringExtra("plan_path") ?: ""
+        val textPath = intent.getStringExtra("text_path") ?: ""
         lifecycleScope.launch {
             try {
                 addLog("Engine start - provider: " + cfg.provider + ", model: " + if (cfg.provider == "custom") cfg.customModel else cfg.model)
@@ -217,7 +218,7 @@ class ProcessingActivity : AppCompatActivity() {
                             { p -> runOnUiThread { setProg(p) } }
                         )
                     }
-                } else if (cfg.planConfirm) {
+                } else if (cfg.planConfirm && source != "text") {
                     val planFile = File(cacheDir, "plan_confirm.json")
                     if (source == "file") {
                         val pf = RecapPipeline.planFromFile(
@@ -250,7 +251,25 @@ class ProcessingActivity : AppCompatActivity() {
                     finish()
                     return@launch
                 } else {
-                    out = if (source == "file") {
+                    out = if (source == "text") {
+                        val txt = withContext(Dispatchers.IO) { if (textPath.isNotEmpty()) File(textPath).readText() else "" }
+                        if (txt.length < 40) throw java.io.IOException(L.s(this@ProcessingActivity, "စာသား မရနိုင်ပါ", "Text not available"))
+                        addLog("TEXT-TO-RECAP: " + txt.length + " chars")
+                        if (cfg.extKey.isEmpty()) throw java.io.IOException(L.s(this@ProcessingActivity, "TEXT mode မှာ TRANSCRIPT MODE provider KEY လိုပါတယ် - TOOLS ထဲမှာ ထည့်ပါ", "Transcript-mode provider key required for text mode"))
+                        stepText.text = L.s(this@ProcessingActivity, "AI နဲ့ ခြုံငုံနေသည်...", "Analyzing text...")
+                        setProg(18)
+                        val plan = withContext(Dispatchers.IO) { GeminiClient.generatePlanTranscript(cfg.extBase, cfg.extKey, cfg.extModel, txt, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle, { s -> runOnUiThread { addLog(s) } }) }
+                        Prefs.bumpUsage(this@ProcessingActivity, Prefs.KEY_U_EXT, 1)
+                        setProg(45)
+                        RecapPipeline.renderYouTube(
+                            this@ProcessingActivity,
+                            plan,
+                            cfg,
+                            { s -> runOnUiThread { stepText.text = s } },
+                            { s -> runOnUiThread { addLog(s) } },
+                            { p -> runOnUiThread { setProg(p) } }
+                        )
+                    } else if (source == "file") {
                         RecapPipeline.runFromFile(
                             this@ProcessingActivity,
                             File(path),
@@ -274,7 +293,7 @@ class ProcessingActivity : AppCompatActivity() {
                 setProg(98)
                 addLog("Recap video ready ✓")
                 val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-                val srcName = if (source == "file") File(path).name else url
+                val srcName = if (source == "file") File(path).name else if (source == "text") "text_recap" else url
                 val archiveVideo = withContext(Dispatchers.IO) {
                     val dir = File(filesDir, "recap_archive/" + stamp)
                     dir.mkdirs()

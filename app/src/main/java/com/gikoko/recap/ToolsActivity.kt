@@ -313,6 +313,26 @@ class ToolsActivity : AppCompatActivity() {
         addGridBox(g7, gridBox("🎬", "VIDEO LAB") { startActivity(Intent(this, VideoLabActivity::class.java)) })
         root.addView(g7)
 
+        val g8 = gridRow()
+        addGridBox(g8, gridBox("📄", "TEXT RECAP") { startActivity(Intent(this, TextRecapActivity::class.java)) })
+        addGridBox(g8, gridBox("🖼", "SLIDESHOW") { startActivity(Intent(this, SlideshowActivity::class.java)) })
+        root.addView(g8)
+
+        val g9 = gridRow()
+        addGridBox(g9, gridBox("🗣", "VOICE-OVER") { startActivity(Intent(this, VoiceOverActivity::class.java)) })
+        addGridBox(g9, gridBox("🎵", "BGM LIBRARY") { startActivity(Intent(this, BgmLibraryActivity::class.java)) })
+        root.addView(g9)
+
+        val g10 = gridRow()
+        addGridBox(g10, gridBox("🎞", "COMPRESS") { startActivity(Intent(this, CompressActivity::class.java)) })
+        addGridBox(g10, gridBox("💬", "SUB BURN") { startActivity(Intent(this, SubtitleBurnActivity::class.java)) })
+        root.addView(g10)
+
+        val g11 = gridRow()
+        addGridBox(g11, gridBox("🖼", "PORTRAIT") { startActivity(Intent(this, PortraitActivity::class.java)) })
+        addGridBox(g11, gridBox("🔥", "WM BURN") { startActivity(Intent(this, WmBurnActivity::class.java)) })
+        root.addView(g11)
+
         val ce = card()
         ce.addView(sectionTitle("TTS ENGINE - အသံထုတ် ယန္တရား"))
         val engG = ChipGroup(this)
