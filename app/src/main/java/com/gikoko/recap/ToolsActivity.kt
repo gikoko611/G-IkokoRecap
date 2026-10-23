@@ -299,6 +299,20 @@ class ToolsActivity : AppCompatActivity() {
         addGridBox(g4, gridBox("🌐", "AI STUDIO") { startActivity(Intent(this, AiStudioActivity::class.java)) })
         root.addView(g4)
 
+        val g5 = gridRow()
+        addGridBox(g5, gridBox("🎬", "VIDEO QUEUE") { startActivity(Intent(this, QueueActivity::class.java)) })
+        addGridBox(g5, gridBox("🎞", "MERGER") { startActivity(Intent(this, MergeActivity::class.java)) })
+        root.addView(g5)
+
+        val g6 = gridRow()
+        addGridBox(g6, gridBox("🖼", "GALLERY") { startActivity(Intent(this, GalleryActivity::class.java)) })
+        addGridBox(g6, gridBox("🧹", "CLEANER") { startActivity(Intent(this, CleanerActivity::class.java)) })
+        root.addView(g6)
+
+        val g7 = gridRow()
+        addGridBox(g7, gridBox("🎬", "VIDEO LAB") { startActivity(Intent(this, VideoLabActivity::class.java)) })
+        root.addView(g7)
+
         val ce = card()
         ce.addView(sectionTitle("TTS ENGINE - အသံထုတ် ယန္တရား"))
         val engG = ChipGroup(this)
