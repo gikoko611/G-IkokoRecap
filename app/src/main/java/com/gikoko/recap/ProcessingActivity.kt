@@ -40,12 +40,27 @@ class ProcessingActivity : AppCompatActivity() {
     private var busy = false
     private var lastProg = 0
     private var startAt = 0L
+    private var lastActivityAt = 0L
+    private var stallWarns = 0
     private val handler = Handler(Looper.getMainLooper())
 
     private val ticker = object : Runnable {
         override fun run() {
             timeText.text = "⏱ " + elapsed()
+            checkStall()
             handler.postDelayed(this, 1000L)
+        }
+    }
+
+    private fun checkStall() {
+        if (!busy || lastActivityAt == 0L) return
+        val idle = (SystemClock.elapsedRealtime() - lastActivityAt) / 1000L
+        if (idle > 150L && stallWarns < 2) {
+            stallWarns = 2
+            addLog("⚠ STALL: " + stepText.text + " - ၂ မိနစ်ခွဲကြာ တုံ့ပြန်မမြင်ပါ။ server ပိတ်နေခြင်း / queue ရှည်ခြင်း / network အားနည်းခြင်း ဖြစ်နိုင်ပါတယ်။ ခဏဆက်စောင့်ပါ၊ ဒါမှမဟုတ် app ပိတ်ပြီး ပြန်စမ်းကြည့်ပါ။")
+        } else if (idle > 45L && stallWarns < 1) {
+            stallWarns = 1
+            addLog("⚠ WAIT: " + stepText.text + " - 45 စက္ကန့်ကြာ တုံ့ပြန်မမြင်ပါ (server busy / queue ဖြစ်နိုင်သည်) - ဆက်စောင့်ဆိုင်းနေသည်...")
         }
     }
 
@@ -75,6 +90,8 @@ class ProcessingActivity : AppCompatActivity() {
     }
 
     private fun addLog(s: String) {
+        lastActivityAt = SystemClock.elapsedRealtime()
+        stallWarns = 0
         val line = "[" + elapsed() + "] " + s + "\n"
         if (s.startsWith("ERROR")) {
             val ss = android.text.SpannableString(line)
@@ -93,6 +110,8 @@ class ProcessingActivity : AppCompatActivity() {
     }
 
     private fun setProg(p: Int) {
+        lastActivityAt = SystemClock.elapsedRealtime()
+        stallWarns = 0
         if (p < lastProg) return
         lastProg = p
         if (p == 18) {
@@ -107,6 +126,8 @@ class ProcessingActivity : AppCompatActivity() {
     private fun runPipeline() {
         if (busy) return
         busy = true
+        lastActivityAt = SystemClock.elapsedRealtime()
+        stallWarns = 0
         val saved = Prefs.apiKey(this)
         val apiKey = if (saved.isNotEmpty()) saved else (intent.getStringExtra("api_key") ?: "")
         val cfg = RecapConfig(
