@@ -53,6 +53,12 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
 
             val cfg = RecapConfigFactory.fromPrefs(applicationContext)
             validateConfiguration(cfg, source)
+            val usesGeminiApi = Prefs.ttsEngine(applicationContext) != "edge" ||
+                (source != "text" && source != "queue" && !(cfg.transcriptMode && cfg.extKey.isNotBlank()) && cfg.provider != "custom")
+            if (usesGeminiApi && cfg.apiKey.isNotBlank()) {
+                appendLog("API HEALTH: " + GeminiClient.testKey(cfg.apiKey))
+            }
+            appendLog("USAGE GUARD: " + Prefs.usageLine(applicationContext))
 
             if (planPath.isEmpty() && cfg.planConfirm && source in setOf("file", "youtube")) {
                 val generated = if (source == "file") {
