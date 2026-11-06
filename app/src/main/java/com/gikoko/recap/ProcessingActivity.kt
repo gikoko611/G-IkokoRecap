@@ -16,6 +16,8 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.gikoko.recap.net.GeminiClient
 import com.gikoko.recap.recap.DownloadsUtil
 import com.gikoko.recap.recap.RecapConfig
@@ -42,6 +44,9 @@ class ProcessingActivity : AppCompatActivity() {
     private var startAt = 0L
     private var lastActivityAt = 0L
     private var stallWarns = 0
+    private var workerObserverAttached = false
+    private var workerResultHandled = false
+    private var lastWorkerLog = ""
     private val handler = Handler(Looper.getMainLooper())
 
     private val ticker = object : Runnable {
@@ -136,6 +141,28 @@ class ProcessingActivity : AppCompatActivity() {
         val queueIdx = intent.getIntExtra("queue_idx", 0)
         val queueSeries = intent.getBooleanExtra("queue_series", false)
         val prevSummary = intent.getStringExtra("prev_summary") ?: ""
+        val source = intent.getStringExtra("source") ?: "youtube"
+        val url = intent.getStringExtra("url") ?: ""
+        val path = intent.getStringExtra("path") ?: ""
+        val planPath = intent.getStringExtra("plan_path") ?: ""
+
+        if (intent.hasExtra(RecapWorker.KEY_WORK_NAME)) {
+            observePersistentWork(intent.getStringExtra(RecapWorker.KEY_WORK_NAME) ?: RecapWorker.WORK_NAME)
+            return
+        }
+        if (!queueMode && source in setOf("file", "youtube")) {
+            val workName = RecapWorker.enqueue(
+                this,
+                source,
+                if (source == "file") path else url,
+                planPath
+            )
+            intent.putExtra(RecapWorker.KEY_WORK_NAME, workName)
+            addLog("PERSISTENT JOB: WorkManager ဖြင့် background processing စတင်သည်")
+            observePersistentWork(workName)
+            return
+        }
+
         val saved = Prefs.apiKey(this)
         val apiKey = if (saved.isNotEmpty()) saved else (intent.getStringExtra("api_key") ?: "")
         val cfg = RecapConfig(
@@ -176,10 +203,6 @@ class ProcessingActivity : AppCompatActivity() {
             Prefs.bgmVol(this).toDouble(),
             if (queueMode && queueSeries) prevSummary else ""
         )
-        val source = intent.getStringExtra("source") ?: "youtube"
-        val url = intent.getStringExtra("url") ?: ""
-        val path = intent.getStringExtra("path") ?: ""
-        val planPath = intent.getStringExtra("plan_path") ?: ""
         val textPath = intent.getStringExtra("text_path") ?: ""
         lifecycleScope.launch {
             try {
@@ -394,6 +417,103 @@ class ProcessingActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun observePersistentWork(workName: String) {
+        if (workerObserverAttached) return
+        workerObserverAttached = true
+        busy = true
+        stepText.text = L.s(this, "Background job ကို စောင့်ကြည့်နေသည်...", "Watching persistent background job...")
+        addLog("WORKMANAGER: " + workName)
+        WorkManager.getInstance(this).getWorkInfosForUniqueWorkLiveData(workName).observe(this) { infos ->
+            val info = infos?.firstOrNull() ?: return@observe
+            lastActivityAt = SystemClock.elapsedRealtime()
+            val progress = info.progress.getInt(RecapWorker.KEY_PROGRESS, lastProg)
+            if (progress >= lastProg) setProg(progress)
+            val step = info.progress.getString(RecapWorker.KEY_STEP)
+            if (!step.isNullOrBlank()) stepText.text = step
+            val logs = info.progress.getString(RecapWorker.KEY_LOG).orEmpty()
+            if (logs.isNotEmpty() && logs != lastWorkerLog) {
+                lastWorkerLog = logs
+                logText.text = logs
+                logScroll.post { logScroll.fullScroll(View.FOCUS_DOWN) }
+            }
+            when (info.state) {
+                WorkInfo.State.ENQUEUED -> {
+                    stepText.text = L.s(this, "Internet / Background slot ကို စောင့်နေသည်...", "Waiting for network / background slot...")
+                }
+                WorkInfo.State.RUNNING -> {
+                    if (step.isNullOrBlank()) stepText.text = L.s(this, "လုပ်ဆောင်နေသည်...", "Processing...")
+                }
+                WorkInfo.State.SUCCEEDED -> {
+                    if (workerResultHandled) return@observe
+                    workerResultHandled = true
+                    busy = false
+                    val data = info.outputData
+                    if (data.getBoolean(RecapWorker.KEY_NEEDS_CONFIRM, false)) {
+                        val ci = Intent(this, ConfirmActivity::class.java)
+                        ci.putExtra("plan_path", data.getString(RecapWorker.KEY_PLAN_PATH))
+                        ci.putExtra("source", data.getString(RecapWorker.KEY_SOURCE))
+                        ci.putExtra("url", data.getString(RecapWorker.KEY_URL))
+                        ci.putExtra("path", data.getString(RecapWorker.KEY_PATH))
+                        addLog("Plan ready ✓ - opening PLAN EDITOR")
+                        startActivity(ci)
+                        finish()
+                        return@observe
+                    }
+                    val video = data.getString(RecapWorker.KEY_VIDEO).orEmpty()
+                    if (video.isEmpty() || !File(video).exists()) {
+                        showWorkerFailure("Worker completed but output video was not found.")
+                        return@observe
+                    }
+                    addLog("Background recap completed ✓")
+                    val result = Intent(this, ResultActivity::class.java)
+                    result.putExtra("video", video)
+                    result.putExtra("srt", data.getString(RecapWorker.KEY_SRT))
+                    result.putExtra("title", data.getString(RecapWorker.KEY_TITLE))
+                    result.putExtra("summary", data.getString(RecapWorker.KEY_SUMMARY))
+                    result.putExtra("thumb", data.getString(RecapWorker.KEY_THUMB))
+                    result.putExtra("short", data.getString(RecapWorker.KEY_SHORT))
+                    result.putExtra("podcast", data.getString(RecapWorker.KEY_PODCAST))
+                    result.putExtra("source_url", data.getString(RecapWorker.KEY_SOURCE_URL))
+                    startActivity(result)
+                    finish()
+                }
+                WorkInfo.State.FAILED -> {
+                    if (workerResultHandled) return@observe
+                    workerResultHandled = true
+                    busy = false
+                    showWorkerFailure(info.outputData.getString(RecapWorker.KEY_ERROR) ?: "Unknown background processing error")
+                }
+                WorkInfo.State.CANCELLED -> {
+                    if (workerResultHandled) return@observe
+                    workerResultHandled = true
+                    busy = false
+                    showWorkerFailure("Background job was cancelled.")
+                }
+                else -> Unit
+            }
+        }
+    }
+
+    private fun showWorkerFailure(message: String) {
+        stepText.text = L.s(this, "မအောင်မြင်ပါ", "Failed")
+        addLog("ERROR: " + message)
+        AlertDialog.Builder(this)
+            .setTitle(L.s(this, "Recap မအောင်မြင်ပါ", "Recap failed"))
+            .setMessage(message)
+            .setPositiveButton(L.s(this, "ထပ်စမ်းမည်", "Retry")) { _, _ ->
+                intent.removeExtra(RecapWorker.KEY_WORK_NAME)
+                workerObserverAttached = false
+                workerResultHandled = false
+                lastWorkerLog = ""
+                lastProg = 0
+                bar.setProgress(0)
+                busy = false
+                runPipeline()
+            }
+            .setNegativeButton(L.s(this, "ပြန်သွားမည်", "Go back")) { _, _ -> finish() }
+            .show()
     }
 
     private fun build(root: LinearLayout) {
