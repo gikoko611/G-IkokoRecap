@@ -337,8 +337,9 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
             appendLog("QUEUE CHECKPOINT: retained successful item states; retry will skip completed videos")
         }
         val final = lastArchived!!.copy(
-            summary = lastArchived!!.summary + "\n\nQUEUE REPORT\nCompleted: " + completed + "/" + paths.length() +
-                "\nFailed: " + failed + "\nPending: " + pending
+            summary = "QUEUE REPORT\nCompleted: " + completed + "/" + paths.length() +
+                "\nFailed: " + failed + "\nPending: " + pending +
+                "\n\n" + lastArchived!!.summary.take(1100)
         )
         progressValue = if (pending == 0 && failed == 0) 100 else progressValue
         publish(if (failed == 0 && pending == 0) "Queue completed" else "Queue partially completed",
