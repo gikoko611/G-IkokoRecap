@@ -180,7 +180,7 @@ class SettingsActivity : AppCompatActivity() {
             val chip = chipOf(label)
             chip.id = 51000 + i
             chip.setOnCheckedChangeListener { _, checked ->
-                if (checked) {
+                if (checked && Prefs.uiTheme(this) != themeIds[i]) {
                     Prefs.save(this, Prefs.KEY_UI_THEME, themeIds[i])
                     Toast.makeText(this, "Theme saved • စာမျက်နှာပြန်ဖွင့်ပါ", Toast.LENGTH_SHORT).show()
                     recreate()
