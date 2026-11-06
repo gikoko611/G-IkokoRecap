@@ -149,17 +149,21 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
     }
 
     private fun validateConfiguration(cfg: com.gikoko.recap.recap.RecapConfig, source: String) {
-        if (source == "text" && cfg.extKey.isBlank()) {
-            throw IllegalArgumentException("Text Recap အတွက် Transcript Provider API Key လိုအပ်ပါသည်။")
+        val canAnalyze = when {
+            source == "text" -> cfg.extKey.isNotBlank()
+            cfg.transcriptMode && cfg.extKey.isNotBlank() -> true
+            cfg.provider == "custom" -> cfg.customKey.isNotBlank()
+            else -> cfg.apiKey.isNotBlank()
         }
-        if (source != "text" && cfg.provider == "custom" && cfg.customKey.isBlank()) {
-            throw IllegalArgumentException("Custom Provider API Key မရှိပါ။ Settings မှာ ထည့်ပါ။")
-        }
-        if (source != "text" && cfg.provider != "custom" && !cfg.transcriptMode && cfg.apiKey.isBlank()) {
-            throw IllegalArgumentException("Gemini API Key မရှိပါ။ Settings မှာ ထည့်ပါ။")
-        }
-        if (source != "text" && cfg.transcriptMode && cfg.extKey.isBlank() && cfg.apiKey.isBlank()) {
-            throw IllegalArgumentException("Transcript Provider သို့မဟုတ် Gemini API Key တစ်ခု လိုအပ်ပါသည်။")
+        if (!canAnalyze) {
+            val hint = if (source == "text") {
+                "Text Recap အတွက် Transcript Provider API Key လိုအပ်ပါသည်။"
+            } else if (cfg.provider == "custom") {
+                "Custom Provider API Key မရှိပါ။ Settings မှာ ထည့်ပါ။"
+            } else {
+                "Gemini API Key မရှိပါ။ Settings မှာ ထည့်ပါ။"
+            }
+            throw IllegalArgumentException(hint)
         }
         if (Prefs.ttsEngine(applicationContext) != "edge" && cfg.apiKey.isBlank()) {
             throw IllegalArgumentException("Gemini TTS အတွက် API Key လိုအပ်ပါသည်။ Edge TTS ကိုရွေးနိုင်သည်။")
