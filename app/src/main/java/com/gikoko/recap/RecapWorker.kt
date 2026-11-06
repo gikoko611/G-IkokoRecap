@@ -391,10 +391,15 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 retriever.release()
             }
         }
+        val sourceLabel = when (source) {
+            "file" -> File(sourceRef).name
+            "text" -> "text_recap"
+            else -> sourceRef
+        }
         val meta = JSONObject()
             .put("title", out.title)
             .put("date", stamp)
-            .put("source", sourceRef)
+            .put("source", sourceLabel)
             .put("summary", out.summary)
         File(dir, "meta.json").writeText(meta.toString())
         if (forceAutosave || Prefs.autosave(applicationContext)) {
