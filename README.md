@@ -63,3 +63,8 @@ Repository: https://github.com/gikoko611/G-IkokoRecap
 
 ## Developer
 I Ko Ko — **Powered By I KO KO**
+
+
+## Reliability Engine
+
+See [RELIABILITY.md](RELIABILITY.md) for WorkManager recovery, resumable Gemini uploads, checkpoints, device protection, and known limitations.
