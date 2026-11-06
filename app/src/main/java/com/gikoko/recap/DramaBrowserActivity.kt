@@ -205,7 +205,7 @@ class DramaBrowserActivity : AppCompatActivity() {
         """.trimIndent()
         browser.evaluateJavascript(js) { raw ->
             try {
-                val encoded = raw?.trim()?.removeSurrounding("\\\"") ?: ""
+                val encoded = raw?.trim()?.removeSurrounding("\"") ?: ""
                 val arr = org.json.JSONArray(String(Base64.decode(encoded, Base64.DEFAULT), Charsets.UTF_8))
                 if (arr.length() == 0) {
                     Toast.makeText(this, "Public video URL မတွေ့ပါ", Toast.LENGTH_LONG).show()
