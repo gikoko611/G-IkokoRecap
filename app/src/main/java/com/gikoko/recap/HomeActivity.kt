@@ -63,6 +63,24 @@ class HomeActivity : AppCompatActivity() {
         if (uri != null) onVideoPicked(uri)
     }
 
+    private val openDramaBrowser = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val path = result.data?.getStringExtra("video_path").orEmpty()
+            val imported = File(path)
+            if (path.isNotBlank() && imported.exists() && imported.length() > 0L) {
+                pickedFile = imported
+                if (::fileLabel.isInitialized) {
+                    val mb = imported.length() / (1024.0 * 1024.0)
+                    fileLabel.text = "Drama video imported: " + imported.name + " (" + String.format("%.1f", mb) + " MB)"
+                }
+                setMode("file")
+                Toast.makeText(this, "Drama video ready ✓ Choose recap settings and press START", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, "Imported video file was not found", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_home)
@@ -81,6 +99,8 @@ class HomeActivity : AppCompatActivity() {
             linkInput.setText(shared.trim())
             setMode("youtube")
             Toast.makeText(this, L.s(this@HomeActivity, "YouTube link ရပါပြီ - START နှိပ်ပါ", "YouTube link ready - press START"), Toast.LENGTH_LONG).show()
+        } else if (!shared.isNullOrBlank() && (shared.trim().startsWith("https://") || shared.trim().startsWith("http://"))) {
+            openDramaBrowser.launch(Intent(this, DramaBrowserActivity::class.java).putExtra("page_url", shared.trim()))
         }
     }
 
@@ -398,6 +418,21 @@ class HomeActivity : AppCompatActivity() {
         modes.addView(ytB, mp1)
         modes.addView(fbB, mp2)
         c2.addView(modes)
+
+        val dramaBrowserBtn = Button(this)
+        dramaBrowserBtn.text = "🌏  CHINESE / KOREAN DRAMA BROWSER"
+        dramaBrowserBtn.isAllCaps = false
+        dramaBrowserBtn.textSize = 13f
+        dramaBrowserBtn.setTypeface(null, Typeface.BOLD)
+        dramaBrowserBtn.setTextColor(Color.parseColor("#0A0A00"))
+        dramaBrowserBtn.setBackgroundResource(R.drawable.bg_gold_btn)
+        dramaBrowserBtn.setPadding(dp(8), dp(13), dp(8), dp(13))
+        val browserLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        browserLp.topMargin = dp(10)
+        c2.addView(dramaBrowserBtn, browserLp)
+        dramaBrowserBtn.setOnClickListener {
+            openDramaBrowser.launch(Intent(this, DramaBrowserActivity::class.java))
+        }
 
         linkBox = LinearLayout(this)
         linkBox.orientation = LinearLayout.VERTICAL
