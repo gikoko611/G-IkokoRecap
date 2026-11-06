@@ -152,14 +152,10 @@ class ProcessingActivity : AppCompatActivity() {
             return
         }
         if (intentApiKey.isBlank() && queueMode) {
-            val workName = RecapWorker.enqueueQueue(
-                this,
-                intent.getStringExtra("queue") ?: "[]",
-                queueSeries
-            )
-            intent.putExtra(RecapWorker.KEY_WORK_NAME, workName)
-            addLog("PERSISTENT QUEUE: WorkManager ဖြင့် queue background processing စတင်သည်")
-            observePersistentWork(workName)
+            val queueJson = intent.getStringExtra("queue") ?: "[]"
+            startPersistentWork(RecapWorker.queueFingerprint(queueJson)) {
+                RecapWorker.enqueueQueue(this, queueJson, queueSeries)
+            }
             return
         }
         if (intentApiKey.isBlank() && source in setOf("file", "youtube", "text")) {
@@ -168,10 +164,10 @@ class ProcessingActivity : AppCompatActivity() {
                 "text" -> textPath
                 else -> url
             }
-            val workName = RecapWorker.enqueue(this, source, sourceRef, planPath)
-            intent.putExtra(RecapWorker.KEY_WORK_NAME, workName)
-            addLog("PERSISTENT JOB: WorkManager ဖြင့် background processing စတင်သည်")
-            observePersistentWork(workName)
+            val fingerprint = RecapWorker.fingerprint(source, sourceRef, planPath)
+            startPersistentWork(fingerprint) {
+                RecapWorker.enqueue(this, source, sourceRef, planPath)
+            }
             return
         }
 
@@ -426,6 +422,37 @@ class ProcessingActivity : AppCompatActivity() {
                     db.setNegativeButton(L.s(this@ProcessingActivity, "အသေးစိတ်ကြည့်မည်", "See details")) { d, _ -> d.dismiss() }
                     db.show()
                 }
+            }
+        }
+    }
+
+    private fun startPersistentWork(fingerprint: String, enqueue: () -> String) {
+        var checked = false
+        WorkManager.getInstance(this).getWorkInfosForUniqueWorkLiveData(RecapWorker.WORK_NAME).observe(this) { infos ->
+            if (checked) return@observe
+            val active = infos?.firstOrNull {
+                it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.BLOCKED
+            }
+            checked = true
+            if (active != null) {
+                val existingFingerprint = active.inputData.getString(RecapWorker.KEY_JOB_FINGERPRINT)
+                if (existingFingerprint == fingerprint) {
+                    addLog("DUPLICATE GUARD: matching active job found; attaching to existing work")
+                    intent.putExtra(RecapWorker.KEY_WORK_NAME, RecapWorker.WORK_NAME)
+                    observePersistentWork(RecapWorker.WORK_NAME)
+                } else {
+                    busy = false
+                    AlertDialog.Builder(this)
+                        .setTitle(L.s(this, "အခြား Job လုပ်နေဆဲပါ", "Another recap is already running"))
+                        .setMessage(L.s(this, "လက်ရှိ Background Job ပြီးဆုံးသည်အထိ စောင့်ပါ။ Video အများအပြားအတွက် Queue ကို အသုံးပြုပါ။", "Wait for the active background job to finish. Use Queue for multiple videos."))
+                        .setPositiveButton("OK") { _, _ -> finish() }
+                        .show()
+                }
+            } else {
+                val workName = enqueue()
+                intent.putExtra(RecapWorker.KEY_WORK_NAME, workName)
+                addLog("PERSISTENT JOB: WorkManager background processing queued")
+                observePersistentWork(workName)
             }
         }
     }
