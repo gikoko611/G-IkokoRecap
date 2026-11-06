@@ -54,7 +54,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
             val cfg = RecapConfigFactory.fromPrefs(applicationContext)
             validateConfiguration(cfg, source)
             val usesGeminiApi = Prefs.ttsEngine(applicationContext) != "edge" ||
-                (source != "text" && source != "queue" && !(cfg.transcriptMode && cfg.extKey.isNotBlank()) && cfg.provider != "custom")
+                (source != "text" && !(cfg.transcriptMode && cfg.extKey.isNotBlank()) && cfg.provider != "custom")
             if (usesGeminiApi && cfg.apiKey.isNotBlank()) {
                 appendLog("API HEALTH: " + GeminiClient.testKey(cfg.apiKey))
             }
