@@ -1,5 +1,6 @@
 package com.gikoko.recap.net
 
+import android.content.Context
 import android.util.Base64
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -222,43 +223,133 @@ object GeminiClient {
         return executeJson(req, "Gemini GET")
     }
 
+    private data class UploadQuery(val offset: Long, val fileName: String, val finalized: Boolean)
+
+    private fun uploadStateFile(context: Context, file: File, mime: String, displayName: String): File {
+        val identity = file.absolutePath + "|" + file.length() + "|" + file.lastModified() + "|" + mime + "|" + displayName
+        val hash = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(identity.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+        val dir = File(context.filesDir, "gemini_upload_sessions").apply { mkdirs() }
+        return File(dir, hash + ".json")
+    }
+
+    private fun saveUploadState(stateFile: File?, uploadUrl: String, file: File, offset: Long) {
+        if (stateFile == null) return
+        runCatching {
+            val state = JSONObject()
+                .put("uploadUrl", uploadUrl)
+                .put("fileLength", file.length())
+                .put("lastModified", file.lastModified())
+                .put("offset", offset)
+                .put("savedAt", System.currentTimeMillis())
+            val temp = File(stateFile.parentFile, stateFile.name + ".tmp")
+            temp.writeText(state.toString())
+            if (stateFile.exists()) stateFile.delete()
+            if (!temp.renameTo(stateFile)) {
+                temp.copyTo(stateFile, overwrite = true)
+                temp.delete()
+            }
+        }
+    }
+
+    private fun queryUploadSession(uploadUrl: String): UploadQuery? {
+        val req = Request.Builder()
+            .url(uploadUrl)
+            .header("X-Goog-Upload-Protocol", "resumable")
+            .header("X-Goog-Upload-Command", "query")
+            .post(ByteArray(0).toRequestBody("application/octet-stream".toMediaType()))
+            .build()
+        client.newCall(req).execute().use { resp ->
+            val txt = resp.body?.string().orEmpty()
+            if (resp.code == 400 || resp.code == 404 || resp.code == 410) return null
+            if (!resp.isSuccessful) {
+                throw IOException("Upload session query failed HTTP " + resp.code + ": " + txt.take(300))
+            }
+            val root = runCatching { JSONObject(txt) }.getOrNull()
+            val fileObj = root?.optJSONObject("file") ?: root
+            val fileName = fileObj?.optString("name", "").orEmpty()
+            val status = resp.header("X-Goog-Upload-Status").orEmpty().lowercase()
+            val received = resp.header("X-Goog-Upload-Size-Received")?.toLongOrNull()
+                ?: root?.optString("sizeReceived", "")?.toLongOrNull()
+                ?: 0L
+            return UploadQuery(received, fileName, status == "final" || fileName.isNotEmpty())
+        }
+    }
+
     fun uploadVideo(
         apiKey: String,
         file: File,
         mime: String,
         displayName: String,
-        onLog: (String) -> Unit = {}
+        onLog: (String) -> Unit = {},
+        context: Context? = null
     ): String {
         if (!file.exists() || !file.isFile || file.length() <= 0L) {
             throw IOException("Video file မရှိပါ သို့မဟုတ် empty ဖြစ်နေသည်")
         }
         val totalBytes = file.length()
         onLog("Upload preparing: " + String.format(java.util.Locale.US, "%.1f MB", totalBytes / (1024.0 * 1024.0)))
-        val meta = JSONObject().put("file", JSONObject().put("display_name", displayName)).toString()
-        val startReq = Request.Builder()
-            .url(BASE + "/upload/v1beta/files?key=" + apiKey)
-            .header("X-Goog-Upload-Protocol", "resumable")
-            .header("X-Goog-Upload-Command", "start")
-            .header("X-Goog-Upload-Header-Content-Length", file.length().toString())
-            .header("X-Goog-Upload-Header-Content-Type", mime)
-            .post(meta.toRequestBody(JSON_MEDIA))
-            .build()
-        var uploadUrl: String
-        client.newCall(startReq).execute().use { resp ->
-            val txt = resp.body?.string() ?: ""
-            if (!resp.isSuccessful) throw IOException("Upload start failed HTTP " + resp.code + ": " + txt.take(400))
-            uploadUrl = resp.header("X-Goog-Upload-URL")
-                ?: throw IOException("No upload URL returned")
+        val stateFile = context?.let { uploadStateFile(it, file, mime, displayName) }
+        var uploadUrl = ""
+        var offset = 0L
+        var fileName = ""
+
+        if (stateFile != null && stateFile.exists()) {
+            val saved = runCatching { JSONObject(stateFile.readText()) }.getOrNull()
+            val matches = saved != null &&
+                saved.optLong("fileLength", -1L) == totalBytes &&
+                saved.optLong("lastModified", -1L) == file.lastModified()
+            if (matches) {
+                val candidate = saved?.optString("uploadUrl", "").orEmpty()
+                if (candidate.isNotEmpty()) {
+                    val status = queryUploadSession(candidate)
+                    if (status != null) {
+                        uploadUrl = candidate
+                        offset = status.offset.coerceIn(0L, totalBytes)
+                        fileName = status.fileName
+                        if (status.finalized && fileName.isNotEmpty()) {
+                            stateFile.delete()
+                            onLog("UPLOAD RESUME: server confirms upload already finalized")
+                            return fileName
+                        }
+                        saveUploadState(stateFile, uploadUrl, file, offset)
+                        onLog("UPLOAD RESUME: continuing from acknowledged " +
+                            String.format(java.util.Locale.US, "%.1f MB", offset / (1024.0 * 1024.0)))
+                    } else {
+                        stateFile.delete()
+                        onLog("UPLOAD RESUME: old session expired; starting a fresh session")
+                    }
+                } else {
+                    stateFile.delete()
+                }
+            } else {
+                stateFile.delete()
+            }
         }
-        // Adaptive Gemini resumable upload: 100 KiB to 1 MiB.
-        // Increase the chunk after fast acknowledged transfers; decrease it on slow transfers.
-        // The Gemini File API sample uses a configurable chunk size; keep each request modest
-        // for low-memory Android devices and unstable mobile networks.
+
+        if (uploadUrl.isEmpty()) {
+            val meta = JSONObject().put("file", JSONObject().put("display_name", displayName)).toString()
+            val startReq = Request.Builder()
+                .url(BASE + "/upload/v1beta/files?key=" + apiKey)
+                .header("X-Goog-Upload-Protocol", "resumable")
+                .header("X-Goog-Upload-Command", "start")
+                .header("X-Goog-Upload-Header-Content-Length", totalBytes.toString())
+                .header("X-Goog-Upload-Header-Content-Type", mime)
+                .post(meta.toRequestBody(JSON_MEDIA))
+                .build()
+            client.newCall(startReq).execute().use { resp ->
+                val txt = resp.body?.string() ?: ""
+                if (!resp.isSuccessful) throw IOException("Upload start failed HTTP " + resp.code + ": " + txt.take(400))
+                uploadUrl = resp.header("X-Goog-Upload-URL")
+                    ?: throw IOException("No upload URL returned")
+            }
+            saveUploadState(stateFile, uploadUrl, file, 0L)
+        }
+
         val minChunkSize = 100 * 1024
         val maxChunkSize = 1024 * 1024
         var chunkSize = 256 * 1024
-        var offset = 0L
-        var fileName = ""
         var chunkNumber = 0
         java.io.RandomAccessFile(file, "r").use { raf ->
             while (offset < totalBytes) {
@@ -266,42 +357,90 @@ object GeminiClient {
                 val bytes = ByteArray(count)
                 raf.seek(offset)
                 raf.readFully(bytes)
-                val isLast = offset + count >= totalBytes
+                val startOffset = offset
+                val isLast = startOffset + count >= totalBytes
                 val command = if (isLast) "upload, finalize" else "upload"
-                val chunkReq = Request.Builder()
-                    .url(uploadUrl)
-                    .header("Content-Length", count.toString())
-                    .header("X-Goog-Upload-Offset", offset.toString())
-                    .header("X-Goog-Upload-Command", command)
-                    .post(bytes.toRequestBody(mime.toMediaType()))
-                    .build()
-                val chunkStartedAt = System.nanoTime()
-                client.newCall(chunkReq).execute().use { resp ->
-                    val txt = resp.body?.string() ?: ""
-                    if (!resp.isSuccessful) {
-                        throw IOException("Gemini upload chunk ${chunkNumber + 1} failed HTTP ${resp.code}: " + txt.take(400))
+                var acceptedOffset: Long? = null
+                var attempts = 0
+                while (acceptedOffset == null) {
+                    val chunkReq = Request.Builder()
+                        .url(uploadUrl)
+                        .header("Content-Length", count.toString())
+                        .header("X-Goog-Upload-Offset", startOffset.toString())
+                        .header("X-Goog-Upload-Command", command)
+                        .post(bytes.toRequestBody(mime.toMediaType()))
+                        .build()
+                    val chunkStartedAt = System.nanoTime()
+                    try {
+                        client.newCall(chunkReq).execute().use { resp ->
+                            val txt = resp.body?.string() ?: ""
+                            if (!resp.isSuccessful) {
+                                throw IOException("Gemini upload chunk " + (chunkNumber + 1) + " failed HTTP " + resp.code + ": " + txt.take(400))
+                            }
+                            if (isLast) {
+                                val root = JSONObject(txt)
+                                val fileObj = root.optJSONObject("file") ?: root
+                                fileName = fileObj.optString("name", "")
+                                if (fileName.isEmpty()) throw IOException("Upload response missing file name: " + txt.take(200))
+                            }
+                        }
+                        acceptedOffset = startOffset + count
+                    } catch (e: IOException) {
+                        val serverState = runCatching { queryUploadSession(uploadUrl) }.getOrNull()
+                        if (serverState != null) {
+                            if (serverState.finalized && serverState.fileName.isNotEmpty()) {
+                                fileName = serverState.fileName
+                                acceptedOffset = totalBytes
+                            } else if (serverState.offset > startOffset) {
+                                acceptedOffset = serverState.offset.coerceAtMost(totalBytes)
+                            }
+                        }
+                        if (acceptedOffset == null) {
+                            attempts++
+                            if (attempts > 3 || !isTransientFailure(e)) throw e
+                            val delay = retryDelayMs(attempts - 1)
+                            onLog("UPLOAD RETRY: chunk " + (chunkNumber + 1) + " after " + (delay / 1000.0) + "s")
+                            Thread.sleep(delay)
+                        }
                     }
-                    if (isLast) {
-                        val j = JSONObject(txt)
-                        val fileObj = j.optJSONObject("file") ?: j
-                        fileName = fileObj.optString("name", "")
-                        if (fileName.isEmpty()) throw IOException("Upload response missing file name: " + txt.take(200))
+                    if (acceptedOffset != null) {
+                        val elapsedMs = ((System.nanoTime() - chunkStartedAt) / 1_000_000L).coerceAtLeast(1L)
+                        offset = acceptedOffset!!.coerceIn(0L, totalBytes)
+                        chunkNumber++
+                        if (elapsedMs < 2000L && chunkSize < maxChunkSize) {
+                            chunkSize = minOf(chunkSize + 100 * 1024, maxChunkSize)
+                        } else if (elapsedMs > 8000L && chunkSize > minChunkSize) {
+                            chunkSize = maxOf(chunkSize - 100 * 1024, minChunkSize)
+                        }
+                        saveUploadState(stateFile, uploadUrl, file, offset)
+                        val percent = ((offset * 100L) / totalBytes).toInt().coerceIn(0, 100)
+                        onLog("Upload acknowledged: " + percent + "% (" +
+                            String.format(java.util.Locale.US, "%.1f / %.1f MB", offset / (1024.0 * 1024.0), totalBytes / (1024.0 * 1024.0)) +
+                            ") - chunk " + chunkNumber + ", next " + (chunkSize / 1024) + " KB")
                     }
                 }
-                val elapsedMs = ((System.nanoTime() - chunkStartedAt) / 1_000_000L).coerceAtLeast(1L)
-                offset += count
-                chunkNumber++
-                if (elapsedMs < 2000L && chunkSize < maxChunkSize) {
-                    chunkSize = minOf(chunkSize + 100 * 1024, maxChunkSize)
-                } else if (elapsedMs > 8000L && chunkSize > minChunkSize) {
-                    chunkSize = maxOf(chunkSize - 100 * 1024, minChunkSize)
-                }
-                val percent = ((offset * 100L) / totalBytes).toInt().coerceIn(0, 100)
-                onLog("Upload acknowledged: " + percent + "% (" +
-                    String.format(java.util.Locale.US, "%.1f / %.1f MB", offset / (1024.0 * 1024.0), totalBytes / (1024.0 * 1024.0)) +
-                    ") - chunk " + chunkNumber + ", next " + (chunkSize / 1024) + " KB")
+                if (fileName.isNotEmpty()) break
             }
         }
+
+        if (fileName.isEmpty()) {
+            val finalizeReq = Request.Builder()
+                .url(uploadUrl)
+                .header("Content-Length", "0")
+                .header("X-Goog-Upload-Offset", offset.toString())
+                .header("X-Goog-Upload-Command", "upload, finalize")
+                .post(ByteArray(0).toRequestBody(mime.toMediaType()))
+                .build()
+            client.newCall(finalizeReq).execute().use { resp ->
+                val txt = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw IOException("Gemini upload finalize failed HTTP " + resp.code + ": " + txt.take(400))
+                val root = JSONObject(txt)
+                fileName = (root.optJSONObject("file") ?: root).optString("name", "")
+            }
+        }
+        if (fileName.isEmpty()) throw IOException("Upload completed but Gemini file name was not returned")
+        stateFile?.delete()
+        onLog("UPLOAD COMPLETE: " + fileName)
         return fileName
     }
 
