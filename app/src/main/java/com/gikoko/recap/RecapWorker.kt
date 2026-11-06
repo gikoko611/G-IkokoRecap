@@ -499,14 +499,30 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         private const val MAX_RETRIES = 2
 
         fun fingerprint(source: String, pathOrUrl: String, planPath: String = ""): String {
-            val raw = source + "|" + pathOrUrl + "|" + planPath
+            val sourceIdentity = if (source == "file" || source == "text") {
+                val file = File(pathOrUrl)
+                if (file.exists()) pathOrUrl + "|" + file.length() + "|" + file.lastModified() else pathOrUrl
+            } else pathOrUrl
+            val raw = source + "|" + sourceIdentity + "|" + planPath
             return java.security.MessageDigest.getInstance("SHA-256")
                 .digest(raw.toByteArray(Charsets.UTF_8))
                 .joinToString("") { "%02x".format(it) }
         }
 
         fun queueFingerprint(queueJson: String): String {
-            return fingerprint("queue", queueJson)
+            val identity = runCatching {
+                val array = JSONArray(queueJson)
+                buildString {
+                    for (i in 0 until array.length()) {
+                        val path = array.getString(i)
+                        val file = File(path)
+                        append(path).append('|')
+                        if (file.exists()) append(file.length()).append('|').append(file.lastModified())
+                        append(';')
+                    }
+                }
+            }.getOrDefault(queueJson)
+            return fingerprint("queue", identity)
         }
 
         fun enqueue(context: Context, source: String, pathOrUrl: String, planPath: String = ""): String {
