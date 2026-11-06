@@ -47,6 +47,15 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         val planPath = inputData.getString(KEY_PLAN_PATH).orEmpty()
         return try {
             val cfg = RecapConfigFactory.fromPrefs(applicationContext)
+            if (cfg.provider == "custom" && cfg.customKey.isBlank()) {
+                throw IllegalArgumentException("Custom Provider API Key မရှိပါ။ Settings မှာ ထည့်ပါ။")
+            }
+            if (cfg.provider != "custom" && !cfg.transcriptMode && cfg.apiKey.isBlank()) {
+                throw IllegalArgumentException("Gemini API Key မရှိပါ။ Settings မှာ ထည့်ပါ။")
+            }
+            if (Prefs.ttsEngine(applicationContext) != "edge" && cfg.apiKey.isBlank()) {
+                throw IllegalArgumentException("Gemini TTS အတွက် API Key လိုအပ်ပါသည်။ Edge TTS ကိုရွေးနိုင်သည်။")
+            }
             publish("Background engine started", "Persistent WorkManager job is running")
             if (planPath.isEmpty() && cfg.planConfirm) {
                 val generated = if (source == "file") {
@@ -123,6 +132,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
             }
             publish("Validating and saving output...", null)
             val archived = archiveOutput(out, source, if (source == "file") path else url)
+            if (planPath.isNotEmpty()) runCatching { File(planPath).delete() }
             progressValue = 100
             publish("Completed", "Output validation and archive completed")
             Result.success(
@@ -130,7 +140,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                     KEY_VIDEO to archived.video.absolutePath,
                     KEY_SRT to archived.srt.absolutePath,
                     KEY_TITLE to archived.title,
-                    KEY_SUMMARY to archived.summary.take(3500),
+                    KEY_SUMMARY to archived.summary.take(1500),
                     KEY_THUMB to archived.thumb.absolutePath,
                     KEY_SHORT to (archived.shortFile?.absolutePath ?: ""),
                     KEY_PODCAST to (archived.podcast?.absolutePath ?: ""),
@@ -195,7 +205,8 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
     private fun appendLog(line: String) {
         synchronized(logLock) {
             logBuffer.append(line).append('\n')
-            if (logBuffer.length > 5000) logBuffer.delete(0, logBuffer.length - 5000)
+            if (logBuffer.length > 1800) logBuffer.delete(0, logBuffer.length - 1800)
+            DebugLog.log(applicationContext, "worker: " + line.take(240))
             setProgressAsync(
                 workDataOf(
                     KEY_PROGRESS to progressValue,
