@@ -153,7 +153,7 @@ class ProcessingActivity : AppCompatActivity() {
         }
         if (intentApiKey.isBlank() && queueMode) {
             val queueJson = intent.getStringExtra("queue") ?: "[]"
-            startPersistentWork(RecapWorker.queueFingerprint(queueJson)) {
+            startPersistentWork(RecapWorker.queueFingerprint(queueJson, queueSeries)) {
                 RecapWorker.enqueueQueue(this, queueJson, queueSeries)
             }
             return
