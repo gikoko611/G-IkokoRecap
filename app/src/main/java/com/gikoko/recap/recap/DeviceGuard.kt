@@ -23,7 +23,8 @@ object DeviceGuard {
         onLog("DEVICE CHECK: input OK (" + String.format("%.1f", file.length() / 1048576.0) + " MB)")
     }
 
-    fun checkRender(context: Context, onLog: (String) -> Unit): Boolean {
+    fun checkRender(context: Context, onLog: (String) -> Unit, pruneCaches: Boolean = true): Boolean {
+        if (pruneCaches) CacheMaintenance.prune(context, onLog)
         checkStorage(context, MIN_FREE_BYTES, onLog)
         var lowResource = false
         val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
