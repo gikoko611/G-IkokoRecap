@@ -4,7 +4,7 @@ import android.content.Context
 import com.gikoko.recap.recap.RecapConfig
 
 object RecapConfigFactory {
-    fun fromPrefs(context: Context, seriesContext: String = ""): RecapConfig {
+    fun fromPrefs(context: Context, seriesContext: String = "", planConfirmOverride: Boolean? = null): RecapConfig {
         return RecapConfig(
             Prefs.apiKey(context),
             Prefs.provider(context),
@@ -33,7 +33,7 @@ object RecapConfigFactory {
             Prefs.wmPos(context),
             Prefs.wmLogo(context),
             Prefs.theme(context),
-            Prefs.planConfirm(context),
+            planConfirmOverride ?: Prefs.planConfirm(context),
             Prefs.shorts(context),
             Prefs.podcast(context),
             Prefs.dialogue(context),
