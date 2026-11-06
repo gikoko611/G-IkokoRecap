@@ -526,6 +526,8 @@ object RecapPipeline {
             append(cfg.watermark).append('|').append(cfg.vertical).append('|')
             append(cfg.wmSize).append('|').append(cfg.wmPos).append('|')
             append(cfg.wmLogo).append('|').append(cfg.theme).append('|').append(cfg.introOutro)
+            val logo = File(cfg.wmLogo)
+            if (logo.exists()) append('|').append(logo.length()).append('|').append(logo.lastModified())
         }
         return sha256(value)
     }
