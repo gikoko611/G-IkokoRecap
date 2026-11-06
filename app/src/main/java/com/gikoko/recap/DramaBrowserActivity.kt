@@ -102,9 +102,11 @@ class DramaBrowserActivity : AppCompatActivity() {
         root.addView(navRow)
 
         val actionRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val copy = button("COPY PAGE LINK")
-        importButton = button("IMPORT VIDEO", true)
+        val copy = button("COPY PAGE")
+        val copyVideo = button("COPY VIDEO URL")
+        importButton = button("IMPORT", true)
         actionRow.addView(copy, LinearLayout.LayoutParams(0, dp(46), 1f))
+        actionRow.addView(copyVideo, LinearLayout.LayoutParams(0, dp(46), 1f))
         actionRow.addView(importButton, LinearLayout.LayoutParams(0, dp(46), 1f))
         root.addView(actionRow)
 
@@ -160,6 +162,7 @@ class DramaBrowserActivity : AppCompatActivity() {
                 Toast.makeText(this, "Page link copied", Toast.LENGTH_SHORT).show()
             }
         }
+        copyVideo.setOnClickListener { copyVideoUrl() }
         importButton.setOnClickListener { findAndImportVideo() }
 
         if (address.text.isNotBlank()) loadAddress() else {
@@ -181,6 +184,41 @@ class DramaBrowserActivity : AppCompatActivity() {
         }
         address.setText(raw)
         browser.loadUrl(raw)
+    }
+
+    private fun copyVideoUrl() {
+        val js = """
+            (function() {
+              var urls = [];
+              document.querySelectorAll('video').forEach(function(v) {
+                if (v.currentSrc) urls.push(v.currentSrc);
+                if (v.src) urls.push(v.src);
+                v.querySelectorAll('source').forEach(function(s) { if (s.src) urls.push(s.src); });
+              });
+              document.querySelectorAll('a[href]').forEach(function(a) {
+                var h=a.href||'';
+                if (/\.(mp4|m4v|webm|mov|3gp)(\?|$)/i.test(h)) urls.push(h);
+              });
+              urls = Array.from(new Set(urls)).filter(function(u) { return /^https?:\/\//i.test(u); });
+              return btoa(unescape(encodeURIComponent(JSON.stringify(urls))));
+            })();
+        """.trimIndent()
+        browser.evaluateJavascript(js) { raw ->
+            try {
+                val encoded = raw?.trim()?.removeSurrounding("\\\"") ?: ""
+                val arr = org.json.JSONArray(String(Base64.decode(encoded, Base64.DEFAULT), Charsets.UTF_8))
+                if (arr.length() == 0) {
+                    Toast.makeText(this, "Public video URL မတွေ့ပါ", Toast.LENGTH_LONG).show()
+                } else {
+                    val videoUrl = arr.getString(0)
+                    val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    cm.setPrimaryClip(ClipData.newPlainText("Video URL", videoUrl))
+                    Toast.makeText(this, "Video URL copied ✓", Toast.LENGTH_SHORT).show()
+                }
+            } catch (_: Exception) {
+                Toast.makeText(this, "Video URL ကို မဖတ်နိုင်ပါ", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun findAndImportVideo() {
