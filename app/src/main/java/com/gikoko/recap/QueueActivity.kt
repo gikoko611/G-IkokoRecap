@@ -164,7 +164,7 @@ class QueueActivity : AppCompatActivity() {
         root.addView(clearBtn, cp)
         clearBtn.setOnClickListener { clearQueue() }
 
-        val warn = note("⚠️ Queue လုပ်နေစဉ် ဖုန်း screen မပိတ်ပါနဲ့ - app က screen အလိုအလျောက် ဖွင့်ထားပေးပါမယ်။ ဖုန်း RAM နည်းလို့ တစ်ချိန်ချင်း video ၁ ခုပဲ လုပ်ပါတယ်။ Queue mode မှာ PLAN EDITOR ကို ခဏ ပိတ်ထားပြီး အလိုအလျောက် ဆက်လုပ်ပါမယ်။ ပြီးတဲ့ video တွေက History ထဲမှာလည်း အလိုအလျောက် မှတ်တမ်းတင်ပါမယ်။")
+        val warn = note("⚠️ WorkManager background queue ဖြစ်သောကြောင့် screen ပိတ်ထားလည်း ဆက်လုပ်နိုင်ပါသည်။ Notification မှာ Progress ကို ပြန်ဖွင့်ကြည့်နိုင်ပါသည်။ Redmi/MIUI Battery Saver ကန့်သတ်ပါက App Battery setting ကို Unrestricted ထားပါ။ RAM သက်သာစေရန် Video တစ်ခုချင်းစီ ဆက်တိုက်လုပ်ပြီး ပြီးသွားသောအပိုင်းများကို checkpoint သိမ်းထားပါမည်။ Queue mode မှာ PLAN EDITOR ကို ခဏ ပိတ်ထားပါမည်။")
         warn.setPadding(dp(16), dp(8), dp(16), dp(16))
         root.addView(warn)
 
