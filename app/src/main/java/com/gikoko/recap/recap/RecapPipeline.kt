@@ -84,7 +84,18 @@ object RecapPipeline {
         onLog: (String) -> Unit,
         onProgress: (Int) -> Unit
     ): RecapOutput {
-        val (plan, useFrames) = planFromFile(context, srcFile, cfg, onStep, onLog, onProgress)
+        val checkpointKey = PlanCheckpoint.keyForFile(srcFile, cfg)
+        val cachedPlan = PlanCheckpoint.load(context, checkpointKey)
+        val (plan, useFrames) = if (cachedPlan != null) {
+            onLog("CHECKPOINT: saved AI plan restored; skipping repeated analysis")
+            onStep(L.s(context, "သိမ်းထားသော Plan မှ ဆက်လုပ်နေသည်...", "Resuming from saved plan..."))
+            onProgress(45)
+            cachedPlan
+        } else {
+            val generated = planFromFile(context, srcFile, cfg, onStep, onLog, onProgress)
+            PlanCheckpoint.save(context, checkpointKey, generated.first, generated.second)
+            generated
+        }
         return renderFromFile(context, srcFile, plan, cfg, useFrames, onStep, onLog, onProgress)
     }
 
@@ -96,7 +107,18 @@ object RecapPipeline {
         onLog: (String) -> Unit,
         onProgress: (Int) -> Unit
     ): RecapOutput {
-        val plan = planFromYouTube(context, url, cfg, onStep, onLog, onProgress)
+        val checkpointKey = PlanCheckpoint.keyForYouTube(url, cfg)
+        val cachedPlan = PlanCheckpoint.load(context, checkpointKey)
+        val plan = if (cachedPlan != null) {
+            onLog("CHECKPOINT: saved AI plan restored; skipping repeated Gemini analysis")
+            onStep(L.s(context, "သိမ်းထားသော Plan မှ ဆက်လုပ်နေသည်...", "Resuming from saved plan..."))
+            onProgress(45)
+            cachedPlan.first
+        } else {
+            val generated = planFromYouTube(context, url, cfg, onStep, onLog, onProgress)
+            PlanCheckpoint.save(context, checkpointKey, generated, true)
+            generated
+        }
         return renderYouTube(context, plan, cfg, onStep, onLog, onProgress)
     }
 
@@ -401,8 +423,13 @@ object RecapPipeline {
     private fun tryTranscriptFallback(context: Context, e: Exception, cfg: RecapConfig, url: String, onLog: (String) -> Unit): RecapPlan {
         val m = (e.message ?: "").lowercase()
         val quota = m.contains("429") || m.contains("resource_exhausted") || m.contains("quota") || m.contains("rate limit")
-        if (!quota || !cfg.transcriptFallback || cfg.extKey.isEmpty()) throw e
-        onLog("Quota hit - transcript fallback (" + cfg.extModel + ")")
+        val transient = GeminiClient.isTransientFailure(e)
+        if ((!quota && !transient) || !cfg.transcriptFallback || cfg.extKey.isEmpty()) throw e
+        onLog(if (quota) {
+            "Quota/rate limit - switching to transcript fallback (" + cfg.extModel + ")"
+        } else {
+            "Gemini/network service unavailable - switching to transcript fallback (" + cfg.extModel + ")"
+        })
         return transcriptPlan(context, cfg, url, onLog)
     }
 
