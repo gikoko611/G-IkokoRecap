@@ -550,6 +550,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 .setConstraints(constraints)
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30L, TimeUnit.SECONDS)
                 .addTag(WORK_NAME)
+                .addTag("job_" + fingerprint(source, pathOrUrl, planPath))
                 .build()
             WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, request)
             return WORK_NAME
@@ -573,6 +574,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 .setConstraints(constraints)
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30L, TimeUnit.SECONDS)
                 .addTag(WORK_NAME)
+                .addTag("job_" + queueFingerprint(queueJson, series))
                 .build()
             WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, request)
             return WORK_NAME
