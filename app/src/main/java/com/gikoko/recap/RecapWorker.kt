@@ -65,7 +65,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 } else {
                     appendLog("API HEALTH: selected model " + resolvedModel + " supports generateContent")
                 }
-            } else if (ttsUsesGemini && cfg.apiKey.isNotBlank()) {
+            } else if ((analysisUsesGemini || ttsUsesGemini) && cfg.apiKey.isNotBlank()) {
                 appendLog("API HEALTH: " + GeminiClient.testKey(cfg.apiKey))
             }
             appendLog("USAGE GUARD: " + Prefs.usageLine(applicationContext))
