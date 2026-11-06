@@ -26,17 +26,29 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Generate signing keystore
+      - name: Generate or restore signing keystore
         shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
-          keytool -genkeypair -v \
-            -keystore app/ci.keystore \
-            -storepass gikoko2026 -keypass gikoko2026 \
-            -alias gikoko -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=GIkoko, OU=Recap, O=GIkoko, L=Yangon, C=MM"
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > app/ci.keystore
+            echo "Using persistent Android signing keystore from repository secret."
+          else
+            keytool -genkeypair -v \
+              -keystore app/ci.keystore \
+              -storepass gikoko2026 -keypass gikoko2026 \
+              -alias gikoko -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=GIkoko, OU=Recap, O=GIkoko, L=Yangon, C=MM"
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret configured. This APK uses a temporary signing key and may require uninstalling the previous app before installation."
+          fi
 
       - name: Build release APK
         shell: bash
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -o pipefail
           gradle assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
