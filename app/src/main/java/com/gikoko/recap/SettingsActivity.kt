@@ -1,6 +1,7 @@
 package com.gikoko.recap
 
 import android.content.Intent
+import android.net.Uri
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
@@ -35,10 +36,22 @@ class SettingsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         DebugLog.log(this, "open settings")
         setContentView(R.layout.activity_settings)
+        applyUiTheme()
         val root = findViewById<LinearLayout>(R.id.rootContainer)
         build(root)
         refreshCacheSize()
         updateProviderVis()
+    }
+
+    private fun applyUiTheme() {
+        val accent = when (Prefs.uiTheme(this)) {
+            "blue" -> Color.parseColor("#35D9FF")
+            "violet" -> Color.parseColor("#C77DFF")
+            else -> Color.parseColor("#39FF14")
+        }
+        window.statusBarColor = Color.parseColor("#07110D")
+        window.navigationBarColor = Color.parseColor("#07110D")
+        window.decorView.systemUiVisibility = 0
     }
 
     private fun dp(v: Int): Int {
@@ -50,7 +63,7 @@ class SettingsActivity : AppCompatActivity() {
         tv.text = text
         tv.textSize = 13f
         tv.setTypeface(Typeface.create("sans-serif", Typeface.BOLD), Typeface.BOLD)
-        tv.setTextColor(Color.parseColor("#3DE8F8"))
+        tv.setTextColor(Color.parseColor(when (Prefs.uiTheme(this)) { "blue" -> "#35D9FF"; "violet" -> "#C77DFF"; else -> "#B6FF00" }))
         tv.letterSpacing = 0.15f
         val p = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         p.bottomMargin = dp(10)
@@ -76,12 +89,12 @@ class SettingsActivity : AppCompatActivity() {
         c.isClickable = true
         c.chipBackgroundColor = android.content.res.ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-            intArrayOf(Color.parseColor("#2A2410"), Color.parseColor("#10182C"))
+            intArrayOf(Color.parseColor("#17351B"), Color.parseColor("#10182C"))
         )
         c.chipStrokeWidth = dp(1).toFloat()
         c.chipStrokeColor = android.content.res.ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-            intArrayOf(Color.parseColor("#FFC940"), Color.parseColor("#223055"))
+            intArrayOf(Color.parseColor(when (Prefs.uiTheme(this)) { "blue" -> "#35D9FF"; "violet" -> "#C77DFF"; else -> "#39FF14" }), Color.parseColor("#223055"))
         )
         c.setTextColor(android.content.res.ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
@@ -155,6 +168,35 @@ class SettingsActivity : AppCompatActivity() {
         ht.setTextColor(Color.parseColor("#FFC940"))
         ht.letterSpacing = 0.2f
         head.addView(ht)
+
+        val cTheme = card()
+        cTheme.addView(sectionTitle("APP UI THEME • အသွင်အပြင်"))
+        val themeGroup = ChipGroup(this)
+        themeGroup.isSingleSelection = true
+        themeGroup.isSelectionRequired = true
+        val themeIds = listOf("neon", "blue", "violet")
+        val themeLabels = listOf("NEON EMERALD", "CYBER BLUE", "VIOLET PULSE")
+        themeLabels.forEachIndexed { i, label ->
+            val chip = chipOf(label)
+            chip.id = 51000 + i
+            chip.setOnCheckedChangeListener { _, checked ->
+                if (checked) {
+                    Prefs.save(this, Prefs.KEY_UI_THEME, themeIds[i])
+                    Toast.makeText(this, "Theme saved • စာမျက်နှာပြန်ဖွင့်ပါ", Toast.LENGTH_SHORT).show()
+                    recreate()
+                }
+            }
+            themeGroup.addView(chip)
+        }
+        val currentTheme = themeIds.indexOf(Prefs.uiTheme(this))
+        themeGroup.check(51000 + if (currentTheme >= 0) currentTheme else 0)
+        cTheme.addView(themeGroup)
+        val themeNote = TextView(this)
+        themeNote.text = "Neon Green, Electric Blue နဲ့ Violet Glow — ရွေးချယ်ပြီး Settings ကို ပြန်ဖွင့်ပါ။"
+        themeNote.setTextColor(Color.parseColor("#8A93B2"))
+        themeNote.textSize = 11f
+        cTheme.addView(themeNote)
+        root.addView(cTheme)
 
         val cT = card()
         cT.addView(sectionTitle("TOOLS"))
@@ -323,6 +365,23 @@ class SettingsActivity : AppCompatActivity() {
         ab2.textSize = 12f
         ab2.setPadding(0, dp(6), 0, 0)
         c8.addView(ab2)
+        val contactNote = TextView(this)
+        contactNote.text = "Connect with the developer"
+        contactNote.setTextColor(Color.parseColor("#8A93B2"))
+        contactNote.textSize = 12f
+        c8.addView(contactNote)
+        fun addContact(label: String, url: String) {
+            val link = TextView(this)
+            link.text = label
+            link.textSize = 14f
+            link.setTextColor(Color.parseColor(when (Prefs.uiTheme(this)) { "blue" -> "#35D9FF"; "violet" -> "#C77DFF"; else -> "#39FF14" }))
+            link.setPadding(0, dp(8), 0, dp(4))
+            link.setOnClickListener { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+            c8.addView(link)
+        }
+        addContact("Facebook • G.I KO KO", "https://www.facebook.com/profile.php?id=61592311041041&mibextid=ZbWKwL")
+        addContact("Gmail • gikoko611@gmail.com", "mailto:gikoko611@gmail.com")
+        addContact("GitHub • github.com/gikoko611", "https://github.com/gikoko611")
         root.addView(c8)
 
         val pad = TextView(this)
