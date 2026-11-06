@@ -230,7 +230,7 @@ object GeminiClient {
         val hash = java.security.MessageDigest.getInstance("SHA-256")
             .digest(identity.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
-        val dir = File(context.filesDir, "gemini_upload_sessions").apply { mkdirs() }
+        val dir = File(context.noBackupFilesDir, "gemini_upload_sessions").apply { mkdirs() }
         return File(dir, hash + ".json")
     }
 
@@ -253,7 +253,7 @@ object GeminiClient {
         }
     }
 
-    private fun queryUploadSession(uploadUrl: String): UploadQuery? {
+    private fun queryUploadSession(uploadUrl: String, fallbackOffset: Long = 0L): UploadQuery? {
         val req = Request.Builder()
             .url(uploadUrl)
             .header("X-Goog-Upload-Protocol", "resumable")
@@ -272,7 +272,7 @@ object GeminiClient {
             val status = resp.header("X-Goog-Upload-Status").orEmpty().lowercase()
             val received = resp.header("X-Goog-Upload-Size-Received")?.toLongOrNull()
                 ?: root?.optString("sizeReceived", "")?.toLongOrNull()
-                ?: 0L
+                ?: fallbackOffset
             return UploadQuery(received, fileName, status == "final" || fileName.isNotEmpty())
         }
     }
@@ -303,7 +303,7 @@ object GeminiClient {
             if (matches) {
                 val candidate = saved?.optString("uploadUrl", "").orEmpty()
                 if (candidate.isNotEmpty()) {
-                    val status = queryUploadSession(candidate)
+                    val status = queryUploadSession(candidate, saved?.optLong("offset", 0L) ?: 0L)
                     if (status != null) {
                         uploadUrl = candidate
                         offset = status.offset.coerceIn(0L, totalBytes)
@@ -386,7 +386,7 @@ object GeminiClient {
                         }
                         acceptedOffset = startOffset + count
                     } catch (e: IOException) {
-                        val serverState = runCatching { queryUploadSession(uploadUrl) }.getOrNull()
+                        val serverState = runCatching { queryUploadSession(uploadUrl, startOffset) }.getOrNull()
                         if (serverState != null) {
                             if (serverState.finalized && serverState.fileName.isNotEmpty()) {
                                 fileName = serverState.fileName
