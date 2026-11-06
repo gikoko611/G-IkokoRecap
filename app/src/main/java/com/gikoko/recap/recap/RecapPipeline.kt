@@ -132,6 +132,7 @@ object RecapPipeline {
     ): Pair<RecapPlan, Boolean> {
         val cache = File(context.cacheDir, "recap_work")
         cache.mkdirs()
+        DeviceGuard.checkInput(context, srcFile, onLog)
         onLog("Recap style: " + cfg.style + "  speed=" + cfg.speed + "  vertical=" + cfg.vertical)
         if (cfg.transcriptMode && cfg.extKey.isNotEmpty()) {
             onStep(L.s(context, "Audio ထုတ်နေသည်...", "Extracting audio..."))
@@ -229,6 +230,7 @@ object RecapPipeline {
         onProgress: (Int) -> Unit
     ): RecapOutput {
         if (useFrames) return renderYouTube(context, plan, cfg, onStep, onLog, onProgress)
+        DeviceGuard.checkRender(context, onLog)
         val cache = File(context.cacheDir, "recap_work")
         cache.mkdirs()
         onStep(L.s(context, "အသံထုတ်နေသည်...", "Generating voice..."))
@@ -305,6 +307,8 @@ object RecapPipeline {
         withContext(Dispatchers.Main) {
             compose(context, videoItems, audioItems, out, bgmList)
         }
+        OutputValidator.validateVideo(out, requireAudio = true)
+        onLog("OUTPUT CHECK: video/audio tracks verified ✓")
         onProgress(96)
         val srt = File(cache, "recap.srt")
         withContext(Dispatchers.IO) {
@@ -336,36 +340,45 @@ object RecapPipeline {
         onLog: (String) -> Unit,
         onProgress: (Int) -> Unit
     ): RecapOutput {
+        DeviceGuard.checkRender(context, onLog)
         val cache = File(context.cacheDir, "recap_work")
         cache.mkdirs()
         onStep(L.s(context, "အသံထုတ်နေသည်...", "Generating voice..."))
         val wavs = withContext(Dispatchers.IO) { genWavs(context, cache, cfg, plan.segments, onLog, onProgress, 45, 20) }
 
         onStep(L.s(context, "ပုံဖရင်များ ဆွဲနေသည်...", "Rendering frames..."))
+        val frameDir = File(cache, "frames_" + frameCacheKey(plan, cfg)).apply { mkdirs() }
         val nSeg = plan.segments.size
         withContext(Dispatchers.IO) {
             for (i in plan.segments.indices) {
-                val f = File(cache, "frame_" + i + ".jpg")
-                FrameRenderer.render(plan.title, plan.segments[i].text, i, f, cfg.watermark, cfg.vertical, cfg.wmSize, cfg.wmPos, cfg.wmLogo, cfg.theme)
+                val f = File(frameDir, "frame_" + i + ".jpg")
+                if (!f.exists() || f.length() < 2048L) {
+                    FrameRenderer.render(plan.title, plan.segments[i].text, i, f, cfg.watermark, cfg.vertical, cfg.wmSize, cfg.wmPos, cfg.wmLogo, cfg.theme)
+                    onLog("FRAME CACHE: generated " + (i + 1) + "/" + nSeg)
+                } else {
+                    onLog("FRAME CACHE: reused " + (i + 1) + "/" + nSeg)
+                }
                 onProgress(66 + 6 * (i + 1) / nSeg)
             }
             if (cfg.introOutro) {
-                FrameRenderer.renderBranded(File(cache, "intro.jpg"), true, cfg.watermark, cfg.vertical, cfg.wmSize, cfg.wmPos, cfg.wmLogo, cfg.theme)
-                FrameRenderer.renderBranded(File(cache, "outro.jpg"), false, cfg.watermark, cfg.vertical, cfg.wmSize, cfg.wmPos, cfg.wmLogo, cfg.theme)
+                val intro = File(frameDir, "intro.jpg")
+                val outro = File(frameDir, "outro.jpg")
+                if (!intro.exists() || intro.length() < 2048L) FrameRenderer.renderBranded(intro, true, cfg.watermark, cfg.vertical, cfg.wmSize, cfg.wmPos, cfg.wmLogo, cfg.theme)
+                if (!outro.exists() || outro.length() < 2048L) FrameRenderer.renderBranded(outro, false, cfg.watermark, cfg.vertical, cfg.wmSize, cfg.wmPos, cfg.wmLogo, cfg.theme)
             }
         }
         onStep(L.s(context, "Recap video ဖွဲ့စည်းနေသည်...", "Composing recap video..."))
         onProgress(74)
         val videoItems = ArrayList<EditedMediaItem>()
         if (cfg.introOutro) {
-            videoItems.add(imageItem(File(cache, "intro.jpg"), 2500000L))
+            videoItems.add(imageItem(File(frameDir, "intro.jpg"), 2500000L))
         }
         for (i in plan.segments.indices) {
             val durMs = WavUtil.wavDurationMs(wavs[i].readBytes())
-            videoItems.add(imageItem(File(cache, "frame_" + i + ".jpg"), durMs * 1000L))
+            videoItems.add(imageItem(File(frameDir, "frame_" + i + ".jpg"), durMs * 1000L))
         }
         if (cfg.introOutro) {
-            videoItems.add(imageItem(File(cache, "outro.jpg"), 2500000L))
+            videoItems.add(imageItem(File(frameDir, "outro.jpg"), 2500000L))
         }
         val audioItems = ArrayList<EditedMediaItem>()
         for (w in wavs) {
@@ -385,6 +398,8 @@ object RecapPipeline {
         withContext(Dispatchers.Main) {
             compose(context, videoItems, audioItems, out, bgmList)
         }
+        OutputValidator.validateVideo(out, requireAudio = true)
+        onLog("OUTPUT CHECK: video/audio tracks verified ✓")
         onProgress(96)
         val srt = File(cache, "recap.srt")
         withContext(Dispatchers.IO) {
@@ -462,19 +477,56 @@ object RecapPipeline {
         span: Int
     ): ArrayList<File> = withContext(Dispatchers.IO) {
         val list = ArrayList<File>()
+        val ttsCache = File(context.cacheDir, "tts_cache").apply { mkdirs() }
+        var generatedCount = 0
         for (i in segs.indices) {
             val voice = if (cfg.dialogue && i % 2 == 1) cfg.voice2 else cfg.voice
-            onLog("TTS segment " + (i + 1) + "/" + segs.size + " voice=" + voice)
             val ev = if (cfg.dialogue && i % 2 == 1) Tts.secondEdgeVoice(context) else Tts.defaultEdgeVoice(context)
-            val (pcm, rate) = Tts.generate(context, cfg.apiKey, segs[i].text, voice, cfg.speed, ev)
-            val wav = WavUtil.pcmToWav(pcm, rate)
-            val f = File(cache, "seg_" + i + ".wav")
-            f.writeBytes(wav)
+            val cacheKey = sha256(
+                segs[i].text + "|" + voice + "|" + ev + "|" + cfg.speed + "|" +
+                    cfg.lang + "|" + Prefs.ttsEngine(context)
+            )
+            val f = File(ttsCache, cacheKey + ".wav")
+            val cached = f.exists() && f.length() > 44L && runCatching {
+                WavUtil.wavDurationMs(f.readBytes()) > 0L
+            }.getOrDefault(false)
+            if (cached) {
+                onLog("TTS CACHE: reused segment " + (i + 1) + "/" + segs.size)
+            } else {
+                onLog("TTS segment " + (i + 1) + "/" + segs.size + " voice=" + voice)
+                val (pcm, rate) = Tts.generate(context, cfg.apiKey, segs[i].text, voice, cfg.speed, ev)
+                val wav = WavUtil.pcmToWav(pcm, rate)
+                val temp = File(ttsCache, cacheKey + ".tmp")
+                temp.writeBytes(wav)
+                if (f.exists()) f.delete()
+                if (!temp.renameTo(f)) {
+                    temp.copyTo(f, overwrite = true)
+                    temp.delete()
+                }
+                generatedCount++
+            }
             list.add(f)
             onProgress(base + span * (i + 1) / segs.size)
         }
-        Prefs.bumpUsage(context, Prefs.KEY_U_TTS, list.size)
+        if (generatedCount > 0) Prefs.bumpUsage(context, Prefs.KEY_U_TTS, generatedCount)
+        onLog("TTS CACHE: " + (list.size - generatedCount) + " reused, " + generatedCount + " generated")
         list
+    }
+
+    private fun sha256(value: String): String {
+        val bytes = java.security.MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    private fun frameCacheKey(plan: RecapPlan, cfg: RecapConfig): String {
+        val value = buildString {
+            append(plan.title).append('|')
+            plan.segments.forEach { append(it.text).append('|') }
+            append(cfg.watermark).append('|').append(cfg.vertical).append('|')
+            append(cfg.wmSize).append('|').append(cfg.wmPos).append('|')
+            append(cfg.wmLogo).append('|').append(cfg.theme).append('|').append(cfg.introOutro)
+        }
+        return sha256(value)
     }
 
     private suspend fun compose(
@@ -672,6 +724,8 @@ object RecapPipeline {
         withContext(Dispatchers.Main) {
             compose(context, videoItems, audioItems, out, null)
         }
+        OutputValidator.validateVideo(out, requireAudio = true)
+        onLog("SHORTS CHECK: video/audio tracks verified ✓")
         onProgress(99)
         return out
     }
@@ -703,6 +757,8 @@ object RecapPipeline {
             if (out.exists()) out.delete()
             withContext(Dispatchers.Main) { extractAudio(context, wavFile, out) }
             wavFile.delete()
+            OutputValidator.validateAudio(out)
+            onLog("PODCAST CHECK: audio track verified ✓")
             onLog("Podcast audio: " + String.format("%.1f", out.length() / (1024.0 * 1024.0)) + " MB")
             out
         }
