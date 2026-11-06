@@ -231,7 +231,7 @@ object RecapPipeline {
         onProgress: (Int) -> Unit
     ): RecapOutput {
         if (useFrames) return renderYouTube(context, plan, cfg, onStep, onLog, onProgress)
-        val lowResourceMode = DeviceGuard.checkRender(context, onLog)
+        val lowResourceMode = DeviceGuard.checkRender(context, onLog, pruneCaches = false)
         val cache = File(context.cacheDir, "recap_work")
         cache.mkdirs()
         onStep(L.s(context, "အသံထုတ်နေသည်...", "Generating voice..."))
