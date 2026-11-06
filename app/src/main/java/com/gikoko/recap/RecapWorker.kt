@@ -224,6 +224,23 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         val paths = JSONArray(queueFile.readText())
         if (paths.length() == 0) throw IOException("Queue ဗလာဖြစ်နေပါသည်။")
         val series = inputData.getBoolean(KEY_QUEUE_SERIES, false)
+        val preflightCfg = RecapConfigFactory.fromPrefs(applicationContext, planConfirmOverride = false)
+        validateConfiguration(preflightCfg, "file")
+        val analysisUsesGemini = !(preflightCfg.transcriptMode && preflightCfg.extKey.isNotBlank()) && preflightCfg.provider != "custom"
+        val ttsUsesGemini = Prefs.ttsEngine(applicationContext) != "edge"
+        val selectedModel = if (analysisUsesGemini && preflightCfg.model.contains("flash", ignoreCase = true)) {
+            GeminiClient.resolveAvailableFlashModel(preflightCfg.apiKey, preflightCfg.model)
+                ?: throw IOException("Gemini API မှာ အသုံးပြုနိုင်သော Flash model မတွေ့ပါ။")
+        } else {
+            if ((analysisUsesGemini || ttsUsesGemini) && preflightCfg.apiKey.isNotBlank()) {
+                appendLog("API HEALTH: " + GeminiClient.testKey(preflightCfg.apiKey))
+            }
+            preflightCfg.model
+        }
+        if (selectedModel != preflightCfg.model) {
+            appendLog("AUTO MODEL SELECTOR: " + preflightCfg.model + " unavailable; switched to " + selectedModel)
+        }
+        appendLog("USAGE GUARD: " + Prefs.usageLine(applicationContext))
         val stateFile = File(queueFile.parentFile, queueFile.name + ".state.json")
         val state = runCatching { if (stateFile.exists()) JSONObject(stateFile.readText()) else JSONObject() }.getOrDefault(JSONObject())
         val savedItems = state.optJSONObject("items") ?: JSONObject()
@@ -257,6 +274,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
             }
             publish("Queue item " + (i + 1) + "/" + paths.length(), "Processing " + file.name)
             val cfg = RecapConfigFactory.fromPrefs(applicationContext, if (series) previousSummary else "", false)
+                .copy(model = selectedModel)
             try {
                 validateConfiguration(cfg, "file")
                 val out = RecapPipeline.runFromFile(
