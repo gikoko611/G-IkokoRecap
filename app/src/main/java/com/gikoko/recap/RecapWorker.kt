@@ -558,8 +558,12 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
 
         fun enqueueQueue(context: Context, queueJson: String, series: Boolean): String {
             val dir = File(context.filesDir, "queue_jobs").apply { mkdirs() }
-            val queueFile = File(dir, "queue_" + System.currentTimeMillis() + ".json")
-            queueFile.writeText(queueJson)
+            val queueId = queueFingerprint(queueJson, series)
+            val queueFile = File(dir, "queue_" + queueId + ".json")
+            if (!queueFile.exists()) queueFile.writeText(queueJson)
+            dir.listFiles()?.filter { it.isFile && System.currentTimeMillis() - it.lastModified() > TimeUnit.DAYS.toMillis(7) }?.forEach { stale ->
+                if (stale != queueFile) stale.delete()
+            }
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
