@@ -207,6 +207,10 @@ class HomeActivity : AppCompatActivity() {
         panel.addView(divider, dp1)
 
         panel.addView(menuItem("🏠  Home") { drawer.closeDrawer(Gravity.START) })
+        panel.addView(menuItem("🌏  Chinese / Korean Drama Browser") {
+            drawer.closeDrawer(Gravity.START)
+            openDramaBrowser.launch(Intent(this, DramaBrowserActivity::class.java))
+        })
         panel.addView(menuItem("⚙️  Settings") {
             drawer.closeDrawer(Gravity.START)
             startActivity(Intent(this, SettingsActivity::class.java))
