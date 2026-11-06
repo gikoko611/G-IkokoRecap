@@ -30,7 +30,7 @@
                     android:layout_height="wrap_content"
                     android:text="≡"
                     android:textSize="26sp"
-                    android:textColor="#FFC940"
+                    android:textColor="#39FF14"
                     android:paddingStart="16dp"
                     android:paddingEnd="16dp"
                     android:paddingTop="8dp"
@@ -39,7 +39,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="GIKOKO ONE RECAP"
+                    android:text="G.I KO KO MOVIE STUDIO"
                     android:textSize="15sp"
                     android:textStyle="bold"
                     android:textColor="#FFC940"
