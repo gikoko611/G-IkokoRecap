@@ -166,7 +166,7 @@ object RecapPipeline {
                 onStep(L.s(context, "Video ကို Gemini ဆီ တင်နေသည်...", "Uploading video to Gemini..."))
                 onProgress(3)
                 val mime = GeminiClient.guessMime(srcFile.name)
-                val fileName = GeminiClient.uploadVideo(cfg.apiKey, srcFile, mime, srcFile.name, onLog)
+                val fileName = GeminiClient.uploadVideo(cfg.apiKey, srcFile, mime, srcFile.name, onLog, context)
                 onLog("Upload: " + fileName)
                 onProgress(8)
                 val ready = GeminiClient.waitForFileReady(cfg.apiKey, fileName, onLog)
