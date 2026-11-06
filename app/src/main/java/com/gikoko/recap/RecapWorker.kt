@@ -43,19 +43,72 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         val source = inputData.getString(KEY_SOURCE) ?: return Result.failure(errorData("Missing source type"))
         val path = inputData.getString(KEY_PATH).orEmpty()
         val url = inputData.getString(KEY_URL).orEmpty()
+        val planPath = inputData.getString(KEY_PLAN_PATH).orEmpty()
         return try {
             val cfg = RecapConfigFactory.fromPrefs(applicationContext)
             publish("Background engine started", "Persistent WorkManager job is running")
-            val out = when (source) {
-                "file" -> {
-                    val file = File(path)
-                    RecapPipeline.runFromFile(
-                        applicationContext, file, cfg,
+            if (planPath.isEmpty() && cfg.planConfirm) {
+                val generated = if (source == "file") {
+                    RecapPipeline.planFromFile(
+                        applicationContext, File(path), cfg,
+                        { step -> publish(step, null) },
+                        { log -> appendLog(log) },
+                        { progress -> publishProgress(progress) }
+                    )
+                } else if (source == "youtube") {
+                    Pair(
+                        RecapPipeline.planFromYouTube(
+                            applicationContext, url, cfg,
+                            { step -> publish(step, null) },
+                            { log -> appendLog(log) },
+                            { progress -> publishProgress(progress) }
+                        ), true
+                    )
+                } else {
+                    throw IllegalArgumentException("Unsupported source: " + source)
+                }
+                if (source == "file") {
+                    PlanCheckpoint.save(applicationContext, PlanCheckpoint.keyForFile(File(path), cfg), generated.first, generated.second)
+                } else {
+                    PlanCheckpoint.save(applicationContext, PlanCheckpoint.keyForYouTube(url, cfg), generated.first, generated.second)
+                }
+                val pending = File(applicationContext.filesDir, "pending_plan_" + id + ".json")
+                pending.writeText(GeminiClient.planToJson(generated.first, generated.second))
+                return Result.success(
+                    workDataOf(
+                        KEY_NEEDS_CONFIRM to true,
+                        KEY_PLAN_PATH to pending.absolutePath,
+                        KEY_SOURCE to source,
+                        KEY_PATH to path,
+                        KEY_URL to url
+                    )
+                )
+            }
+            val out = if (planPath.isNotEmpty()) {
+                if (!File(planPath).exists()) throw IllegalArgumentException("Confirmed plan file မတွေ့ပါ။")
+                val loaded = GeminiClient.planFromJson(File(planPath).readText())
+                if (source == "file") {
+                    RecapPipeline.renderFromFile(
+                        applicationContext, File(path), loaded.first, cfg, loaded.second,
+                        { step -> publish(step, null) },
+                        { log -> appendLog(log) },
+                        { progress -> publishProgress(progress) }
+                    )
+                } else {
+                    RecapPipeline.renderYouTube(
+                        applicationContext, loaded.first, cfg,
                         { step -> publish(step, null) },
                         { log -> appendLog(log) },
                         { progress -> publishProgress(progress) }
                     )
                 }
+            } else when (source) {
+                "file" -> RecapPipeline.runFromFile(
+                    applicationContext, File(path), cfg,
+                    { step -> publish(step, null) },
+                    { log -> appendLog(log) },
+                    { progress -> publishProgress(progress) }
+                )
                 "youtube" -> {
                     if (url.isBlank()) throw IllegalArgumentException("YouTube URL မရှိပါ။")
                     RecapPipeline.runFromYouTube(
@@ -154,6 +207,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
 
     private fun publish(step: String, log: String?) {
         currentStep = step
+        runCatching { setForegroundAsync(createForegroundInfo()) }
         if (log != null) appendLog(log)
         else setProgressAsync(workDataOf(KEY_PROGRESS to progressValue, KEY_STEP to currentStep, KEY_LOG to synchronized(logLock) { logBuffer.toString() }))
     }
@@ -217,6 +271,8 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         const val KEY_SOURCE = "source"
         const val KEY_PATH = "path"
         const val KEY_URL = "url"
+        const val KEY_PLAN_PATH = "plan_path"
+        const val KEY_NEEDS_CONFIRM = "needs_confirm"
         const val KEY_PROGRESS = "progress"
         const val KEY_STEP = "step"
         const val KEY_LOG = "log"
@@ -233,13 +289,14 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         private const val NOTIFICATION_ID = 7206
         private const val MAX_RETRIES = 2
 
-        fun enqueue(context: Context, source: String, pathOrUrl: String): String {
+        fun enqueue(context: Context, source: String, pathOrUrl: String, planPath: String = ""): String {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
             val data = Data.Builder()
                 .putString(KEY_SOURCE, source)
                 .putString(if (source == "file") KEY_PATH else KEY_URL, pathOrUrl)
+                .apply { if (planPath.isNotEmpty()) putString(KEY_PLAN_PATH, planPath) }
                 .build()
             val request = OneTimeWorkRequestBuilder<RecapWorker>()
                 .setInputData(data)
