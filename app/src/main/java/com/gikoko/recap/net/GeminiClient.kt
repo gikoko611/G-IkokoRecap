@@ -182,35 +182,33 @@ object GeminiClient {
     }
 
     fun resolveAvailableFlashModel(apiKey: String, currentModel: String, excludeCurrent: Boolean = false): String? {
-        return runCatching {
-            val models = get(apiKey, "/v1beta/models").optJSONArray("models") ?: JSONArray()
-            val available = HashSet<String>()
-            for (i in 0 until models.length()) {
-                val item = models.optJSONObject(i) ?: continue
-                val name = item.optString("name", "").removePrefix("models/")
-                val methods = item.optJSONArray("supportedGenerationMethods") ?: JSONArray()
-                val supportsGenerate = (0 until methods.length()).any { methods.optString(it) == "generateContent" }
-                if (supportsGenerate && name.startsWith("gemini-") &&
-                    name.contains("flash") && !name.contains("tts") &&
-                    !name.contains("image") && !name.contains("live") &&
-                    !name.contains("transcribe")) {
-                    available.add(name)
-                }
+        val models = get(apiKey, "/v1beta/models").optJSONArray("models") ?: JSONArray()
+        val available = HashSet<String>()
+        for (i in 0 until models.length()) {
+            val item = models.optJSONObject(i) ?: continue
+            val name = item.optString("name", "").removePrefix("models/")
+            val methods = item.optJSONArray("supportedGenerationMethods") ?: JSONArray()
+            val supportsGenerate = (0 until methods.length()).any { methods.optString(it) == "generateContent" }
+            if (supportsGenerate && name.startsWith("gemini-") &&
+                name.contains("flash") && !name.contains("tts") &&
+                !name.contains("image") && !name.contains("live") &&
+                !name.contains("transcribe")) {
+                available.add(name)
             }
-            if (!excludeCurrent && currentModel in available) return@runCatching currentModel
-            val candidates = if (excludeCurrent) available.filter { it != currentModel }.toSet() else available
-            val preference = listOf(
-                "gemini-3.8-flash",
-                "gemini-3.7-flash",
-                "gemini-3.6-flash",
-                "gemini-3.5-flash",
-                "gemini-3.5-flash-lite",
-                "gemini-3.1-flash-lite",
-                "gemini-2.5-flash",
-                "gemini-2.5-flash-lite"
-            )
-            preference.firstOrNull { it in candidates } ?: candidates.sorted().firstOrNull()
-        }.getOrNull()
+        }
+        if (!excludeCurrent && currentModel in available) return currentModel
+        val candidates = if (excludeCurrent) available.filter { it != currentModel }.toSet() else available
+        val preference = listOf(
+            "gemini-3.8-flash",
+            "gemini-3.7-flash",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite",
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite"
+        )
+        return preference.firstOrNull { it in candidates } ?: candidates.sorted().firstOrNull()
     }
 
     private fun findAvailableFlashFallback(apiKey: String, currentModel: String): String? =
