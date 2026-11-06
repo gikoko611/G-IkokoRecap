@@ -19,6 +19,7 @@ object DeviceGuard {
         if (file.length() < 1024L) {
             throw IOException("Video file အရွယ်အစား မမှန်ပါ သို့မဟုတ် ဖိုင်ပျက်နေပါသည်။")
         }
+        CacheMaintenance.prune(context, onLog)
         checkStorage(context, MIN_FREE_BYTES, onLog)
         onLog("DEVICE CHECK: input OK (" + String.format("%.1f", file.length() / 1048576.0) + " MB)")
     }
