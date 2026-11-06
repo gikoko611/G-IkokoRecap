@@ -43,6 +43,17 @@ object OutputValidator {
         }
     }
 
+    fun validateSrt(file: File, expectedCues: Int) {
+        if (!file.exists() || !file.isFile || file.length() < 16L) {
+            throw IOException("Subtitle SRT file မရှိပါ သို့မဟုတ် empty ဖြစ်နေပါသည်။")
+        }
+        val text = file.readText()
+        val cues = text.lineSequence().count { it.contains(" --> ") }
+        if (cues != expectedCues || cues == 0) {
+            throw IOException("Subtitle validation failed: expected " + expectedCues + " cues, found " + cues)
+        }
+    }
+
     fun validateAudio(file: File) {
         if (!file.exists() || !file.isFile || file.length() < 1024L) {
             throw IOException("Output audio မရှိပါ သို့မဟုတ် ဖိုင်အရွယ်အစား မမှန်ပါ။")
