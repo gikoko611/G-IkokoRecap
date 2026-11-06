@@ -22,11 +22,13 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.gikoko.recap.net.GeminiClient
 import com.gikoko.recap.recap.DownloadsUtil
+import com.gikoko.recap.recap.PlanCheckpoint
 import com.gikoko.recap.recap.RecapOutput
 import com.gikoko.recap.recap.RecapPipeline
-import com.gikoko.recap.recap.PlanCheckpoint
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -46,18 +48,13 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         val url = inputData.getString(KEY_URL).orEmpty()
         val planPath = inputData.getString(KEY_PLAN_PATH).orEmpty()
         return try {
-            val cfg = RecapConfigFactory.fromPrefs(applicationContext)
-            if (cfg.provider == "custom" && cfg.customKey.isBlank()) {
-                throw IllegalArgumentException("Custom Provider API Key မရှိပါ။ Settings မှာ ထည့်ပါ။")
-            }
-            if (cfg.provider != "custom" && !cfg.transcriptMode && cfg.apiKey.isBlank()) {
-                throw IllegalArgumentException("Gemini API Key မရှိပါ။ Settings မှာ ထည့်ပါ။")
-            }
-            if (Prefs.ttsEngine(applicationContext) != "edge" && cfg.apiKey.isBlank()) {
-                throw IllegalArgumentException("Gemini TTS အတွက် API Key လိုအပ်ပါသည်။ Edge TTS ကိုရွေးနိုင်သည်။")
-            }
             publish("Background engine started", "Persistent WorkManager job is running")
-            if (planPath.isEmpty() && cfg.planConfirm) {
+            if (source == "queue") return processQueue()
+
+            val cfg = RecapConfigFactory.fromPrefs(applicationContext)
+            validateConfiguration(cfg, source)
+
+            if (planPath.isEmpty() && cfg.planConfirm && source in setOf("file", "youtube")) {
                 val generated = if (source == "file") {
                     RecapPipeline.planFromFile(
                         applicationContext, File(path), cfg,
@@ -65,7 +62,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                         { log -> appendLog(log) },
                         { progress -> publishProgress(progress) }
                     )
-                } else if (source == "youtube") {
+                } else {
                     Pair(
                         RecapPipeline.planFromYouTube(
                             applicationContext, url, cfg,
@@ -74,8 +71,6 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                             { progress -> publishProgress(progress) }
                         ), true
                     )
-                } else {
-                    throw IllegalArgumentException("Unsupported source: " + source)
                 }
                 if (source == "file") {
                     PlanCheckpoint.save(applicationContext, PlanCheckpoint.keyForFile(File(path), cfg), generated.first, generated.second)
@@ -84,6 +79,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 }
                 val pending = File(applicationContext.filesDir, "pending_plan_" + id + ".json")
                 pending.writeText(GeminiClient.planToJson(generated.first, generated.second))
+                publish("Plan ready — waiting for your confirmation", "AI plan saved locally; opening Plan Editor")
                 return Result.success(
                     workDataOf(
                         KEY_NEEDS_CONFIRM to true,
@@ -94,6 +90,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                     )
                 )
             }
+
             val out = if (planPath.isNotEmpty()) {
                 if (!File(planPath).exists()) throw IllegalArgumentException("Confirmed plan file မတွေ့ပါ။")
                 val loaded = GeminiClient.planFromJson(File(planPath).readText())
@@ -128,25 +125,15 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                         { progress -> publishProgress(progress) }
                     )
                 }
+                "text" -> runTextRecap(path, cfg)
                 else -> throw IllegalArgumentException("Unsupported source: " + source)
             }
             publish("Validating and saving output...", null)
-            val archived = archiveOutput(out, source, if (source == "file") path else url)
+            val archived = archiveOutput(out, source, if (source == "file" || source == "text") path else url)
             if (planPath.isNotEmpty()) runCatching { File(planPath).delete() }
             progressValue = 100
             publish("Completed", "Output validation and archive completed")
-            Result.success(
-                workDataOf(
-                    KEY_VIDEO to archived.video.absolutePath,
-                    KEY_SRT to archived.srt.absolutePath,
-                    KEY_TITLE to archived.title,
-                    KEY_SUMMARY to archived.summary.take(1500),
-                    KEY_THUMB to archived.thumb.absolutePath,
-                    KEY_SHORT to (archived.shortFile?.absolutePath ?: ""),
-                    KEY_PODCAST to (archived.podcast?.absolutePath ?: ""),
-                    KEY_SOURCE_URL to if (source == "youtube") url else ""
-                )
-            )
+            successData(archived, if (source == "youtube") url else "")
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -161,8 +148,115 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         }
     }
 
-    private fun archiveOutput(out: RecapOutput, source: String, sourceRef: String): Archived {
-        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+    private fun validateConfiguration(cfg: com.gikoko.recap.recap.RecapConfig, source: String) {
+        if (source == "text" && cfg.extKey.isBlank()) {
+            throw IllegalArgumentException("Text Recap အတွက် Transcript Provider API Key လိုအပ်ပါသည်။")
+        }
+        if (source != "text" && cfg.provider == "custom" && cfg.customKey.isBlank()) {
+            throw IllegalArgumentException("Custom Provider API Key မရှိပါ။ Settings မှာ ထည့်ပါ။")
+        }
+        if (source != "text" && cfg.provider != "custom" && !cfg.transcriptMode && cfg.apiKey.isBlank()) {
+            throw IllegalArgumentException("Gemini API Key မရှိပါ။ Settings မှာ ထည့်ပါ။")
+        }
+        if (source != "text" && cfg.transcriptMode && cfg.extKey.isBlank() && cfg.apiKey.isBlank()) {
+            throw IllegalArgumentException("Transcript Provider သို့မဟုတ် Gemini API Key တစ်ခု လိုအပ်ပါသည်။")
+        }
+        if (Prefs.ttsEngine(applicationContext) != "edge" && cfg.apiKey.isBlank()) {
+            throw IllegalArgumentException("Gemini TTS အတွက် API Key လိုအပ်ပါသည်။ Edge TTS ကိုရွေးနိုင်သည်။")
+        }
+    }
+
+    private suspend fun runTextRecap(path: String, cfg: com.gikoko.recap.recap.RecapConfig): RecapOutput {
+        val textFile = File(path)
+        if (!textFile.exists() || !textFile.isFile) throw IOException("Text source file မတွေ့ပါ။")
+        val text = textFile.readText()
+        if (text.length < 40) throw IOException("စာသား မလုံလောက်ပါ။ အနည်းဆုံး 40 characters လိုအပ်ပါသည်။")
+        val key = PlanCheckpoint.keyForFile(textFile, cfg)
+        val cached = PlanCheckpoint.load(applicationContext, key)
+        val plan = if (cached != null) {
+            appendLog("CHECKPOINT: text recap plan restored; skipping repeated text analysis")
+            cached.first
+        } else {
+            publish("Analyzing source text...", null)
+            val generated = GeminiClient.generatePlanTranscript(
+                cfg.extBase, cfg.extKey, cfg.extModel, text,
+                cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, cfg.customStyle,
+                { log -> appendLog(log) }
+            )
+            Prefs.bumpUsage(applicationContext, Prefs.KEY_U_EXT, 1)
+            PlanCheckpoint.save(applicationContext, key, generated, true)
+            generated
+        }
+        return RecapPipeline.renderYouTube(
+            applicationContext, plan, cfg,
+            { step -> publish(step, null) },
+            { log -> appendLog(log) },
+            { progress -> publishProgress(progress) }
+        )
+    }
+
+    private suspend fun processQueue(): Result {
+        val queueFile = File(inputData.getString(KEY_QUEUE_FILE).orEmpty())
+        if (!queueFile.exists()) throw IOException("Queue data file မတွေ့ပါ။")
+        val paths = JSONArray(queueFile.readText())
+        if (paths.length() == 0) throw IOException("Queue ဗလာဖြစ်နေပါသည်။")
+        val series = inputData.getBoolean(KEY_QUEUE_SERIES, false)
+        var previousSummary = ""
+        var completed = 0
+        var failed = 0
+        var lastArchived: Archived? = null
+        var lastFailure: Exception? = null
+
+        for (i in 0 until paths.length()) {
+            val file = File(paths.getString(i))
+            publish("Queue item " + (i + 1) + "/" + paths.length(), "Processing " + file.name)
+            val cfg = RecapConfigFactory.fromPrefs(applicationContext, if (series) previousSummary else "", false)
+            try {
+                validateConfiguration(cfg, "file")
+                val out = RecapPipeline.runFromFile(
+                    applicationContext, file, cfg,
+                    { step -> publish("[" + (i + 1) + "/" + paths.length() + "] " + step, null) },
+                    { log -> appendLog(log) },
+                    { local ->
+                        val overall = (((i + local.coerceIn(0, 100) / 100.0) / paths.length()) * 95.0).toInt()
+                        publishProgress(overall)
+                    }
+                )
+                lastArchived = archiveOutput(out, "file", file.absolutePath, forceAutosave = true)
+                completed++
+                if (series) {
+                    var summary = out.summary
+                    val chapterIndex = summary.indexOf("\n\nCHAPTERS")
+                    if (chapterIndex > 0) summary = summary.substring(0, chapterIndex)
+                    if (summary.length > 700) summary = summary.takeLast(700)
+                    previousSummary = summary
+                }
+                appendLog("QUEUE SUCCESS: " + file.name)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                failed++
+                lastFailure = e
+                appendLog("QUEUE ITEM FAILED: " + file.name + " — " + (e.message ?: e.javaClass.simpleName))
+            }
+        }
+        queueFile.delete()
+        if (completed == 0) throw lastFailure ?: IOException("Queue ထဲက Video တစ်ခုမှ မအောင်မြင်ပါ။")
+        val final = lastArchived!!.copy(
+            summary = lastArchived!!.summary + "\n\nQUEUE REPORT\nCompleted: " + completed + "/" + paths.length() + "\nFailed: " + failed
+        )
+        progressValue = 100
+        publish("Queue completed", "Completed " + completed + "; failed " + failed)
+        return successData(final, "")
+    }
+
+    private fun archiveOutput(
+        out: RecapOutput,
+        source: String,
+        sourceRef: String,
+        forceAutosave: Boolean = false
+    ): Archived {
+        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
         val dir = File(applicationContext.filesDir, "recap_archive/" + stamp)
         if (!dir.mkdirs() && !dir.isDirectory) throw IllegalStateException("Archive folder မဖန်တီးနိုင်ပါ။")
         val video = File(dir, "recap.mp4")
@@ -182,13 +276,16 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         val thumb = File(dir, "thumb.jpg")
         runCatching {
             val retriever = MediaMetadataRetriever()
-            retriever.setDataSource(video.absolutePath)
-            val bitmap = retriever.getFrameAtTime(1_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-            if (bitmap != null) {
-                thumb.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }
-                bitmap.recycle()
+            try {
+                retriever.setDataSource(video.absolutePath)
+                val bitmap = retriever.getFrameAtTime(1_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                if (bitmap != null) {
+                    thumb.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }
+                    bitmap.recycle()
+                }
+            } finally {
+                retriever.release()
             }
-            retriever.release()
         }
         val meta = JSONObject()
             .put("title", out.title)
@@ -196,17 +293,32 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
             .put("source", sourceRef)
             .put("summary", out.summary)
         File(dir, "meta.json").writeText(meta.toString())
-        if (Prefs.autosave(applicationContext)) {
+        if (forceAutosave || Prefs.autosave(applicationContext)) {
             DownloadsUtil.saveRecap(applicationContext, video, if (srt.exists()) srt else null)
         }
         return Archived(video, srt, out.title, out.summary, thumb, short, podcast)
     }
 
+    private fun successData(archived: Archived, sourceUrl: String): Result {
+        return Result.success(
+            workDataOf(
+                KEY_VIDEO to archived.video.absolutePath,
+                KEY_SRT to archived.srt.absolutePath,
+                KEY_TITLE to archived.title.take(200),
+                KEY_SUMMARY to archived.summary.take(1500),
+                KEY_THUMB to if (archived.thumb.exists()) archived.thumb.absolutePath else "",
+                KEY_SHORT to (archived.shortFile?.absolutePath ?: ""),
+                KEY_PODCAST to (archived.podcast?.absolutePath ?: ""),
+                KEY_SOURCE_URL to sourceUrl
+            )
+        )
+    }
+
     private fun appendLog(line: String) {
         synchronized(logLock) {
             logBuffer.append(line).append('\n')
-            if (logBuffer.length > 1800) logBuffer.delete(0, logBuffer.length - 1800)
-            DebugLog.log(applicationContext, "worker: " + line.take(240))
+            if (logBuffer.length > 1600) logBuffer.delete(0, logBuffer.length - 1600)
+            DebugLog.log(applicationContext, "worker: " + line.take(200))
             setProgressAsync(
                 workDataOf(
                     KEY_PROGRESS to progressValue,
@@ -235,7 +347,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         )
     }
 
-    private fun errorData(message: String): Data = workDataOf(KEY_ERROR to message)
+    private fun errorData(message: String): Data = workDataOf(KEY_ERROR to message.take(1800))
 
     private fun createForegroundInfo(): ForegroundInfo {
         val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -254,7 +366,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_upload)
             .setContentTitle("G.I KO KO MOVIE RECAP")
-            .setContentText(currentStep)
+            .setContentText(currentStep.take(120))
             .setContentIntent(pending)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -285,6 +397,8 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         const val KEY_URL = "url"
         const val KEY_PLAN_PATH = "plan_path"
         const val KEY_NEEDS_CONFIRM = "needs_confirm"
+        const val KEY_QUEUE_FILE = "queue_file"
+        const val KEY_QUEUE_SERIES = "queue_series"
         const val KEY_PROGRESS = "progress"
         const val KEY_STEP = "step"
         const val KEY_LOG = "log"
@@ -307,9 +421,31 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 .build()
             val data = Data.Builder()
                 .putString(KEY_SOURCE, source)
-                .putString(if (source == "file") KEY_PATH else KEY_URL, pathOrUrl)
+                .putString(if (source == "file" || source == "text") KEY_PATH else KEY_URL, pathOrUrl)
                 .apply { if (planPath.isNotEmpty()) putString(KEY_PLAN_PATH, planPath) }
                 .build()
+            val request = OneTimeWorkRequestBuilder<RecapWorker>()
+                .setInputData(data)
+                .setConstraints(constraints)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30L, TimeUnit.SECONDS)
+                .addTag(WORK_NAME)
+                .build()
+            WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, request)
+            return WORK_NAME
+        }
+
+        fun enqueueQueue(context: Context, queueJson: String, series: Boolean): String {
+            val dir = File(context.filesDir, "queue_jobs").apply { mkdirs() }
+            val queueFile = File(dir, "queue_" + System.currentTimeMillis() + ".json")
+            queueFile.writeText(queueJson)
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
+            val data = workDataOf(
+                KEY_SOURCE to "queue",
+                KEY_QUEUE_FILE to queueFile.absolutePath,
+                KEY_QUEUE_SERIES to series
+            )
             val request = OneTimeWorkRequestBuilder<RecapWorker>()
                 .setInputData(data)
                 .setConstraints(constraints)
