@@ -219,7 +219,7 @@ class HomeActivity : AppCompatActivity() {
             drawer.closeDrawer(Gravity.START)
             AlertDialog.Builder(this)
                 .setTitle("G.I KO KO MOVIE RECAP STUDIO")
-                .setMessage("Version 2.0 (Pro)\n\nAI video recap - Myanmar voice + captions.\nGemini 3.8 Flash + Custom REST provider.\nDeveloped by I Ko Ko.")
+                .setMessage("Movie Recap + Short Drama Studio\nGemini AI planning • On-device video composition • Subtitle and voice tools\nDeveloped by I Ko Ko.")
                 .setPositiveButton("OK", null)
                 .show()
         })
