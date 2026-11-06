@@ -63,10 +63,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v0.0.2"
+          TAG="v0.0.4"
           gh release create "$TAG" out/GIKOKO-RECAP-release.apk \
             --title "GIKOKO RECAP $TAG" \
-            --notes "GIKOKO RECAP 0.0.2: Edge TTS, Tools page, watermark remover, usage tracker, SRT export, thumbnail maker. Myanmar AI voice + captions video recap." \
+            --notes "GIKOKO RECAP 0.0.4: Persistent WorkManager jobs, Gemini retry/model failover, transcript fallback, AI plan checkpoints, TTS/frame cache, device preflight and MP4 output validation. Existing recap, drama browser, subtitles, voice and local Media3 rendering retained." \
             --target "$GITHUB_SHA" || gh release upload "$TAG" out/GIKOKO-RECAP-release.apk --clobber
 
       - name: Post build log on failure
