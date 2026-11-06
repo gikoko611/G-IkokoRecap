@@ -509,7 +509,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 .joinToString("") { "%02x".format(it) }
         }
 
-        fun queueFingerprint(queueJson: String): String {
+        fun queueFingerprint(queueJson: String, series: Boolean = false): String {
             val identity = runCatching {
                 val array = JSONArray(queueJson)
                 buildString {
@@ -522,7 +522,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                     }
                 }
             }.getOrDefault(queueJson)
-            return fingerprint("queue", identity)
+            return fingerprint(if (series) "queue_series" else "queue", identity)
         }
 
         fun enqueue(context: Context, source: String, pathOrUrl: String, planPath: String = ""): String {
@@ -554,7 +554,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 .build()
             val data = workDataOf(
                 KEY_SOURCE to "queue",
-                KEY_JOB_FINGERPRINT to queueFingerprint(queueJson),
+                KEY_JOB_FINGERPRINT to queueFingerprint(queueJson, series),
                 KEY_QUEUE_FILE to queueFile.absolutePath,
                 KEY_QUEUE_SERIES to series
             )
