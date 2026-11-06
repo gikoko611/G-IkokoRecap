@@ -51,11 +51,21 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
             publish("Background engine started", "Persistent WorkManager job is running")
             if (source == "queue") return processQueue()
 
-            val cfg = RecapConfigFactory.fromPrefs(applicationContext)
+            var cfg = RecapConfigFactory.fromPrefs(applicationContext)
             validateConfiguration(cfg, source)
-            val usesGeminiApi = Prefs.ttsEngine(applicationContext) != "edge" ||
-                (source != "text" && !(cfg.transcriptMode && cfg.extKey.isNotBlank()) && cfg.provider != "custom")
-            if (usesGeminiApi && cfg.apiKey.isNotBlank()) {
+            val analysisUsesGemini = source != "text" &&
+                !(cfg.transcriptMode && cfg.extKey.isNotBlank()) && cfg.provider != "custom"
+            val ttsUsesGemini = Prefs.ttsEngine(applicationContext) != "edge"
+            if (analysisUsesGemini && cfg.model.contains("flash", ignoreCase = true)) {
+                val resolvedModel = GeminiClient.resolveAvailableFlashModel(cfg.apiKey, cfg.model)
+                    ?: throw IOException("Gemini API မှာ အသုံးပြုနိုင်သော Flash model မတွေ့ပါ။")
+                if (resolvedModel != cfg.model) {
+                    appendLog("AUTO MODEL SELECTOR: " + cfg.model + " unavailable; switched to " + resolvedModel)
+                    cfg = cfg.copy(model = resolvedModel)
+                } else {
+                    appendLog("API HEALTH: selected model " + resolvedModel + " supports generateContent")
+                }
+            } else if (ttsUsesGemini && cfg.apiKey.isNotBlank()) {
                 appendLog("API HEALTH: " + GeminiClient.testKey(cfg.apiKey))
             }
             appendLog("USAGE GUARD: " + Prefs.usageLine(applicationContext))
