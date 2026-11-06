@@ -218,7 +218,7 @@ class HomeActivity : AppCompatActivity() {
         panel.addView(menuItem("ℹ️  About") {
             drawer.closeDrawer(Gravity.START)
             AlertDialog.Builder(this)
-                .setTitle("GIKOKO RECAP")
+                .setTitle("G.I KO KO MOVIE RECAP STUDIO")
                 .setMessage("Version 2.0 (Pro)\n\nAI video recap - Myanmar voice + captions.\nGemini 3.8 Flash + Custom REST provider.\nDeveloped by I Ko Ko.")
                 .setPositiveButton("OK", null)
                 .show()
@@ -370,7 +370,7 @@ class HomeActivity : AppCompatActivity() {
         root.addView(logo, lp)
 
         val tag = TextView(this)
-        tag.text = "ONE CLICK  \u2022  AI VIDEO RECAP"
+        tag.text = "MOVIE RECAP  \u2022  SHORT DRAMA STUDIO"
         tag.gravity = Gravity.CENTER
         tag.setTextColor(Color.parseColor("#8A93B2"))
         tag.textSize = 12f
@@ -598,7 +598,7 @@ class HomeActivity : AppCompatActivity() {
         root.addView(c5)
 
         val start = Button(this)
-        start.text = "ONE CLICK RECAP"
+        start.text = "START"
         start.isAllCaps = false
         start.textSize = 16f
         start.setTypeface(null, Typeface.BOLD)
@@ -623,7 +623,7 @@ class HomeActivity : AppCompatActivity() {
         beat.start()
 
         val ver = TextView(this)
-        ver.text = "GIkoko One Recap v0.0.1 Pro \u2022 powered by Gemini 3.8"
+        ver.text = "G.I KO KO MOVIE RECAP STUDIO \u2022 Powered By I KO KO"
         ver.gravity = Gravity.CENTER
         ver.setTextColor(Color.parseColor("#5A6480"))
         ver.textSize = 11f
