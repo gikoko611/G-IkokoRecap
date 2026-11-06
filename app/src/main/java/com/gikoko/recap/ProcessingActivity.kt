@@ -73,7 +73,6 @@ class ProcessingActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         DebugLog.log(this, "open processing")
         setContentView(R.layout.activity_processing)
-        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         startAt = SystemClock.elapsedRealtime()
         val root = findViewById<LinearLayout>(R.id.rootContainer)
         stepText = TextView(this)
@@ -426,7 +425,7 @@ class ProcessingActivity : AppCompatActivity() {
         stepText.text = L.s(this, "Background job ကို စောင့်ကြည့်နေသည်...", "Watching persistent background job...")
         addLog("WORKMANAGER: " + workName)
         WorkManager.getInstance(this).getWorkInfosForUniqueWorkLiveData(workName).observe(this) { infos ->
-            val info = infos?.firstOrNull() ?: return@observe
+            val info = infos?.firstOrNull { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.BLOCKED } ?: infos?.lastOrNull() ?: return@observe
             lastActivityAt = SystemClock.elapsedRealtime()
             val progress = info.progress.getInt(RecapWorker.KEY_PROGRESS, lastProg)
             if (progress >= lastProg) setProg(progress)
