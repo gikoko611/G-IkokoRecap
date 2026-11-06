@@ -12,6 +12,7 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import okio.BufferedSink
 
 data class Segment(val startSec: Int, val endSec: Int, val text: String)
 data class RecapPlan(val title: String, val segments: List<Segment>, val chapters: List<String> = emptyList(), val quiz: List<String> = emptyList())
@@ -25,7 +26,8 @@ object GeminiClient {
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(300, TimeUnit.SECONDS)
-        .writeTimeout(300, TimeUnit.SECONDS)
+        .writeTimeout(10, TimeUnit.MINUTES)
+        .callTimeout(12, TimeUnit.MINUTES)
         .build()
 
     fun normalizeBase(url: String): String {
@@ -135,7 +137,18 @@ object GeminiClient {
         }
     }
 
-    fun uploadVideo(apiKey: String, file: File, mime: String, displayName: String): String {
+    fun uploadVideo(
+        apiKey: String,
+        file: File,
+        mime: String,
+        displayName: String,
+        onLog: (String) -> Unit = {}
+    ): String {
+        if (!file.exists() || !file.isFile || file.length() <= 0L) {
+            throw IOException("Video file မရှိပါ သို့မဟုတ် empty ဖြစ်နေသည်")
+        }
+        val totalBytes = file.length()
+        onLog("Upload preparing: " + String.format(java.util.Locale.US, "%.1f MB", totalBytes / (1024.0 * 1024.0)))
         val meta = JSONObject().put("file", JSONObject().put("display_name", displayName)).toString()
         val startReq = Request.Builder()
             .url(BASE + "/upload/v1beta/files?key=" + apiKey)
@@ -152,12 +165,38 @@ object GeminiClient {
             uploadUrl = resp.header("X-Goog-Upload-URL")
                 ?: throw IOException("No upload URL returned")
         }
+        var lastLoggedPercent = -1
+        var lastLogAt = System.nanoTime()
+        val progressBody = object : okhttp3.RequestBody() {
+            override fun contentType() = mime.toMediaType()
+            override fun contentLength() = totalBytes
+            override fun writeTo(sink: BufferedSink) {
+                val buffer = ByteArray(64 * 1024)
+                var sent = 0L
+                file.inputStream().buffered().use { input ->
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        sink.write(buffer, 0, read)
+                        sent += read
+                        val percent = ((sent * 100L) / totalBytes).toInt().coerceIn(0, 100)
+                        val now = System.nanoTime()
+                        if (percent >= lastLoggedPercent + 5 || now - lastLogAt >= TimeUnit.SECONDS.toNanos(10) || sent == totalBytes) {
+                            onLog("Upload progress: " + percent + "% (" +
+                                String.format(java.util.Locale.US, "%.1f / %.1f MB", sent / (1024.0 * 1024.0), totalBytes / (1024.0 * 1024.0)) + ")")
+                            lastLoggedPercent = percent
+                            lastLogAt = now
+                        }
+                    }
+                }
+            }
+        }
         val upReq = Request.Builder()
             .url(uploadUrl)
             .header("X-Goog-Upload-Command", "upload, finalize")
             .header("X-Goog-Upload-Offset", "0")
             .header("Content-Type", mime)
-            .put(file.asRequestBody(mime.toMediaType()))
+            .put(progressBody)
             .build()
         client.newCall(upReq).execute().use { resp ->
             val txt = resp.body?.string() ?: ""
@@ -171,22 +210,26 @@ object GeminiClient {
     }
 
     fun waitForFileReady(apiKey: String, fileName: String, onLog: (String) -> Unit): String {
-        var tries = 0
-        while (tries < 60) {
-            tries++
-            Thread.sleep(2000)
+        val startedAt = System.nanoTime()
+        val timeoutNanos = TimeUnit.MINUTES.toNanos(10)
+        while (System.nanoTime() - startedAt < timeoutNanos) {
             val j = get(apiKey, "/v1beta/" + fileName)
             val fo = j.optJSONObject("file") ?: j
-            val state = fo.optString("state", "")
-            onLog("File state: " + state)
+            val state = fo.optString("state", "STATE_UNSPECIFIED")
+            val elapsed = TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - startedAt)
+            onLog("Gemini processing: " + state + " (" + elapsed + "s)")
             if (state == "ACTIVE") {
                 var u = fo.optString("uri", "")
                 if (u.isEmpty()) u = BASE + "/v1beta/" + fileName
+                onLog("Video file ACTIVE - analysis စတင်နိုင်ပါပြီ")
                 return u
             }
-            if (state == "FAILED") throw IOException("Video processing failed on server")
+            if (state == "FAILED") {
+                throw IOException("Gemini က video processing ကို FAILED ပြန်ပေးသည်။ Video format/codec ကို စစ်ဆေးပါ။")
+            }
+            Thread.sleep(5000)
         }
-        throw IOException("Timeout waiting for video upload")
+        throw IOException("Gemini video processing 10 မိနစ်ကျော်ကြာနေသည်။ Upload ပြီးပါပြီ (" + fileName + ")၊ ထပ်စမ်းမီ network နှင့် Gemini File status ကို စစ်ဆေးပါ။")
     }
 
     private fun styleBrief(style: String, lang: String): String {
