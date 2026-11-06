@@ -479,6 +479,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         const val KEY_PLAN_PATH = "plan_path"
         const val KEY_NEEDS_CONFIRM = "needs_confirm"
         const val KEY_QUEUE_FILE = "queue_file"
+        const val KEY_JOB_FINGERPRINT = "job_fingerprint"
         const val KEY_QUEUE_SERIES = "queue_series"
         const val KEY_PROGRESS = "progress"
         const val KEY_STEP = "step"
@@ -497,12 +498,24 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         const val COMPLETION_NOTIFICATION_ID = 7207
         private const val MAX_RETRIES = 2
 
+        fun fingerprint(source: String, pathOrUrl: String, planPath: String = ""): String {
+            val raw = source + "|" + pathOrUrl + "|" + planPath
+            return java.security.MessageDigest.getInstance("SHA-256")
+                .digest(raw.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+        }
+
+        fun queueFingerprint(queueJson: String): String {
+            return fingerprint("queue", queueJson)
+        }
+
         fun enqueue(context: Context, source: String, pathOrUrl: String, planPath: String = ""): String {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
             val data = Data.Builder()
                 .putString(KEY_SOURCE, source)
+                .putString(KEY_JOB_FINGERPRINT, fingerprint(source, pathOrUrl, planPath))
                 .putString(if (source == "file" || source == "text") KEY_PATH else KEY_URL, pathOrUrl)
                 .apply { if (planPath.isNotEmpty()) putString(KEY_PLAN_PATH, planPath) }
                 .build()
@@ -525,6 +538,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 .build()
             val data = workDataOf(
                 KEY_SOURCE to "queue",
+                KEY_JOB_FINGERPRINT to queueFingerprint(queueJson),
                 KEY_QUEUE_FILE to queueFile.absolutePath,
                 KEY_QUEUE_SERIES to series
             )
