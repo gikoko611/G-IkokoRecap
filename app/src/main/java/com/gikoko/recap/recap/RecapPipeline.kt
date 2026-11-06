@@ -188,7 +188,8 @@ object RecapPipeline {
                 onProgress(12)
                 onStep(L.s(context, "AI နဲ့ ခြုံငုံသုံးသပ်နေသည်...", "Analyzing with AI..."))
                 onProgress(18)
-                plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, ready, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, styleIn(cfg), onLog)
+                val readyUri = ready ?: throw IOException("Gemini uploaded file URI မရရှိပါ။")
+                plan = GeminiClient.generatePlan(cfg.apiKey, cfg.model, readyUri, cfg.targetMinutes, cfg.lang, cfg.fullSegments, cfg.style, styleIn(cfg), onLog)
                 Prefs.bumpUsage(context, Prefs.KEY_U_PLAN, 1)
                 onProgress(45)
             }
