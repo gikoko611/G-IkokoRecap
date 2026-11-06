@@ -165,13 +165,16 @@ object GeminiClient {
             uploadUrl = resp.header("X-Goog-Upload-URL")
                 ?: throw IOException("No upload URL returned")
         }
-        // Gemini resumable File API accepts media chunks via POST (not PUT).
-        // Small chunks let slow mobile connections make acknowledged progress.
-        val chunkSize = 2 * 1024 * 1024
+        // Adaptive Gemini resumable upload: 100 KiB to 1 MiB.
+        // Increase the chunk after fast acknowledged transfers; decrease it on slow transfers.
+        // The Gemini File API sample uses a configurable chunk size; keep each request modest
+        // for low-memory Android devices and unstable mobile networks.
+        val minChunkSize = 100 * 1024
+        val maxChunkSize = 1024 * 1024
+        var chunkSize = 256 * 1024
         var offset = 0L
         var fileName = ""
         var chunkNumber = 0
-        val totalChunks = ((totalBytes + chunkSize - 1) / chunkSize).toInt()
         java.io.RandomAccessFile(file, "r").use { raf ->
             while (offset < totalBytes) {
                 val count = minOf(chunkSize.toLong(), totalBytes - offset).toInt()
@@ -187,10 +190,11 @@ object GeminiClient {
                     .header("X-Goog-Upload-Command", command)
                     .post(bytes.toRequestBody(mime.toMediaType()))
                     .build()
+                val chunkStartedAt = System.nanoTime()
                 client.newCall(chunkReq).execute().use { resp ->
                     val txt = resp.body?.string() ?: ""
                     if (!resp.isSuccessful) {
-                        throw IOException("Gemini upload chunk ${chunkNumber + 1}/${totalChunks} failed HTTP ${resp.code}: " + txt.take(400))
+                        throw IOException("Gemini upload chunk ${chunkNumber + 1} failed HTTP ${resp.code}: " + txt.take(400))
                     }
                     if (isLast) {
                         val j = JSONObject(txt)
@@ -199,12 +203,18 @@ object GeminiClient {
                         if (fileName.isEmpty()) throw IOException("Upload response missing file name: " + txt.take(200))
                     }
                 }
+                val elapsedMs = ((System.nanoTime() - chunkStartedAt) / 1_000_000L).coerceAtLeast(1L)
                 offset += count
                 chunkNumber++
+                if (elapsedMs < 2000L && chunkSize < maxChunkSize) {
+                    chunkSize = minOf(chunkSize + 100 * 1024, maxChunkSize)
+                } else if (elapsedMs > 8000L && chunkSize > minChunkSize) {
+                    chunkSize = maxOf(chunkSize - 100 * 1024, minChunkSize)
+                }
                 val percent = ((offset * 100L) / totalBytes).toInt().coerceIn(0, 100)
                 onLog("Upload acknowledged: " + percent + "% (" +
                     String.format(java.util.Locale.US, "%.1f / %.1f MB", offset / (1024.0 * 1024.0), totalBytes / (1024.0 * 1024.0)) +
-                    ") - chunk " + chunkNumber + "/" + totalChunks)
+                    ") - chunk " + chunkNumber + ", next " + (chunkSize / 1024) + " KB")
             }
         }
         return fileName
