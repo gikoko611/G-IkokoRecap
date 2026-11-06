@@ -104,37 +104,122 @@ object GeminiClient {
         }
     }
 
+    private class ApiHttpException(val statusCode: Int, message: String) : IOException(message)
+
+    private const val MAX_RETRIES = 3
+
+    private fun isRetryableStatus(code: Int): Boolean =
+        code == 408 || code == 425 || code == 429 || code == 500 || code == 502 || code == 503 || code == 504
+
+    private fun retryDelayMs(attempt: Int, retryAfter: String? = null): Long {
+        val serverDelay = retryAfter?.trim()?.toLongOrNull()?.let { it.coerceIn(1L, 60L) * 1000L }
+        if (serverDelay != null) return serverDelay
+        val base = when (attempt) {
+            0 -> 2000L
+            1 -> 5000L
+            else -> 12000L
+        }
+        return base + java.util.concurrent.ThreadLocalRandom.current().nextLong(250L, 1251L)
+    }
+
+    private fun executeJson(req: Request, label: String): JSONObject {
+        var retries = 0
+        while (true) {
+            try {
+                val retryDelay = client.newCall(req).execute().use { resp ->
+                    val txt = resp.body?.string() ?: ""
+                    if (resp.isSuccessful) return JSONObject(txt)
+                    if (!isRetryableStatus(resp.code) || retries >= MAX_RETRIES) {
+                        throw ApiHttpException(resp.code, label + " HTTP " + resp.code + ": " + txt.take(600))
+                    }
+                    retryDelayMs(retries, resp.header("Retry-After"))
+                }
+                retries++
+                val seconds = retryDelay / 1000.0
+                Thread.sleep(retryDelay)
+            } catch (e: ApiHttpException) {
+                throw e
+            } catch (e: IOException) {
+                if (retries >= MAX_RETRIES) {
+                    throw IOException(label + " network failure after " + (retries + 1) + " attempts: " + (e.message ?: e.javaClass.simpleName), e)
+                }
+                val delay = retryDelayMs(retries)
+                retries++
+                Thread.sleep(delay)
+            }
+        }
+    }
+
+    fun isTransientFailure(error: Throwable): Boolean {
+        var current: Throwable? = error
+        while (current != null) {
+            if (current is ApiHttpException && isRetryableStatus(current.statusCode)) return true
+            if (current is java.net.SocketTimeoutException ||
+                current is java.net.UnknownHostException ||
+                current is java.net.ConnectException ||
+                current is java.net.SocketException) return true
+            val message = current.message.orEmpty().lowercase()
+            if (message.contains("http 408") || message.contains("http 425") ||
+                message.contains("http 429") || message.contains("http 500") ||
+                message.contains("http 502") || message.contains("http 503") ||
+                message.contains("http 504") || message.contains("timeout") ||
+                message.contains("connection reset") || message.contains("unable to resolve host")) return true
+            current = current.cause
+        }
+        return false
+    }
+
+    private fun httpStatus(error: Throwable): Int? {
+        var current: Throwable? = error
+        while (current != null) {
+            if (current is ApiHttpException) return current.statusCode
+            val match = Regex("HTTP\\s+(\\d{3})", RegexOption.IGNORE_CASE).find(current.message.orEmpty())
+            if (match != null) return match.groupValues[1].toIntOrNull()
+            current = current.cause
+        }
+        return null
+    }
+
+    private fun findAvailableFlashFallback(apiKey: String, currentModel: String): String? {
+        return runCatching {
+            val models = get(apiKey, "/v1beta/models").optJSONArray("models") ?: JSONArray()
+            val available = HashSet<String>()
+            for (i in 0 until models.length()) {
+                val item = models.optJSONObject(i) ?: continue
+                val name = item.optString("name", "").removePrefix("models/")
+                val methods = item.optJSONArray("supportedGenerationMethods") ?: JSONArray()
+                val supportsGenerate = (0 until methods.length()).any { methods.optString(it) == "generateContent" }
+                if (supportsGenerate && name.startsWith("gemini-") &&
+                    name.contains("flash") && !name.contains("tts") &&
+                    !name.contains("image") && !name.contains("live") &&
+                    !name.contains("transcribe") && name != currentModel) {
+                    available.add(name)
+                }
+            }
+            val preference = listOf(
+                "gemini-3.7-flash",
+                "gemini-3.6-flash",
+                "gemini-3.5-flash",
+                "gemini-3.5-flash-lite",
+                "gemini-3.1-flash-lite",
+                "gemini-2.5-flash",
+                "gemini-2.5-flash-lite"
+            )
+            preference.firstOrNull { it in available } ?: available.sorted().firstOrNull()
+        }.getOrNull()
+    }
+
     private fun post(apiKey: String, path: String, body: String): JSONObject {
         val req = Request.Builder()
             .url(BASE + path + "?key=" + apiKey)
             .post(body.toRequestBody(JSON_MEDIA))
             .build()
-        var attempt = 0
-        while (true) {
-            client.newCall(req).execute().use { resp ->
-                val txt = resp.body?.string() ?: ""
-                if (resp.isSuccessful) return JSONObject(txt)
-                val retriable = resp.code >= 500 || resp.code == 429
-                if (!retriable || attempt >= 2) throw IOException("HTTP " + resp.code + ": " + txt.take(600))
-                attempt++
-            }
-            Thread.sleep(3000L * attempt)
-        }
+        return executeJson(req, "Gemini request")
     }
 
     private fun get(apiKey: String, path: String): JSONObject {
         val req = Request.Builder().url(BASE + path + "?key=" + apiKey).get().build()
-        var attempt = 0
-        while (true) {
-            client.newCall(req).execute().use { resp ->
-                val txt = resp.body?.string() ?: ""
-                if (resp.isSuccessful) return JSONObject(txt)
-                val retriable = resp.code >= 500 || resp.code == 429
-                if (!retriable || attempt >= 2) throw IOException("HTTP " + resp.code + ": " + txt.take(400))
-                attempt++
-            }
-            Thread.sleep(3000L * attempt)
-        }
+        return executeJson(req, "Gemini GET")
     }
 
     fun uploadVideo(
@@ -305,7 +390,15 @@ object GeminiClient {
         val body = JSONObject()
             .put("contents", JSONArray().put(content))
             .put("generationConfig", JSONObject().put("temperature", 0.4).put("response_mime_type", "application/json"))
-        val resp = post(apiKey, "/v1beta/models/" + model + ":generateContent", body.toString())
+        val requestBody = body.toString()
+        val resp = try {
+            post(apiKey, "/v1beta/models/" + model + ":generateContent", requestBody)
+        } catch (e: IOException) {
+            if (httpStatus(e) != 503) throw e
+            val fallbackModel = findAvailableFlashFallback(apiKey, model) ?: throw e
+            onLog("MODEL FAILOVER: " + model + " is overloaded; trying API-listed model " + fallbackModel)
+            post(apiKey, "/v1beta/models/" + fallbackModel + ":generateContent", requestBody)
+        }
         val txt = resp.getJSONArray("candidates").getJSONObject(0)
             .getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
         onLog("Plan: " + txt.take(300))
