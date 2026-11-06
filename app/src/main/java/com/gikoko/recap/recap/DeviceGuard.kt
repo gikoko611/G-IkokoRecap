@@ -23,14 +23,16 @@ object DeviceGuard {
         onLog("DEVICE CHECK: input OK (" + String.format("%.1f", file.length() / 1048576.0) + " MB)")
     }
 
-    fun checkRender(context: Context, onLog: (String) -> Unit) {
+    fun checkRender(context: Context, onLog: (String) -> Unit): Boolean {
         checkStorage(context, MIN_FREE_BYTES, onLog)
+        var lowResource = false
         val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
         if (manager != null) {
             val info = ActivityManager.MemoryInfo()
             manager.getMemoryInfo(info)
-            if (info.lowMemory || info.availMem < WARN_RAM_BYTES) {
-                onLog("DEVICE WARNING: RAM နည်းနေသည်။ အခြား App များပိတ်ပြီး Render ဆက်လုပ်ပါ။")
+            lowResource = info.lowMemory || info.availMem < WARN_RAM_BYTES
+            if (lowResource) {
+                onLog("DEVICE WARNING: RAM နည်းနေသည်။ Auto Low-Resolution Mode ကို အသုံးပြုမည်။")
             } else {
                 onLog("DEVICE CHECK: available RAM about " + String.format("%.0f", info.availMem / 1048576.0) + " MB")
             }
@@ -38,9 +40,12 @@ object DeviceGuard {
         if (Build.VERSION.SDK_INT >= 29) {
             val power = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
             if (power != null && power.currentThermalStatus >= PowerManager.THERMAL_STATUS_SEVERE) {
-                onLog("DEVICE WARNING: ဖုန်းအပူချိန်မြင့်နေသည်။ အေးသွားပြီးမှ Render ဆက်လုပ်ရန် အကြံပြုသည်။")
+                lowResource = true
+                onLog("DEVICE WARNING: ဖုန်းအပူချိန်မြင့်နေသည်။ Auto Low-Resolution Mode ကို အသုံးပြုမည်။")
             }
         }
+        if (lowResource) onLog("DEVICE GUARD: render resolution automatically reduced for stability")
+        return lowResource
     }
 
     private fun checkStorage(context: Context, required: Long, onLog: (String) -> Unit) {
