@@ -11,8 +11,8 @@ android {
         applicationId 'com.gikoko.onerecap'
         minSdk 24
         targetSdk 34
-        versionCode 26
-        versionName '0.0.1'
+        versionCode 28
+        versionName '0.0.3'
     }
 
     def ksFile = file('ci.keystore')

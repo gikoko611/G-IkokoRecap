@@ -39,6 +39,11 @@
         </activity>
 
         <activity
+            android:name=".DramaBrowserActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
             android:name=".ProcessingActivity"
             android:exported="false"
             android:screenOrientation="portrait" />

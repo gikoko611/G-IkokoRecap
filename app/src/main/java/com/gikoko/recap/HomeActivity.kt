@@ -63,6 +63,24 @@ class HomeActivity : AppCompatActivity() {
         if (uri != null) onVideoPicked(uri)
     }
 
+    private val openDramaBrowser = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val path = result.data?.getStringExtra("video_path").orEmpty()
+            val imported = File(path)
+            if (path.isNotBlank() && imported.exists() && imported.length() > 0L) {
+                pickedFile = imported
+                if (::fileLabel.isInitialized) {
+                    val mb = imported.length() / (1024.0 * 1024.0)
+                    fileLabel.text = "Drama video imported: " + imported.name + " (" + String.format("%.1f", mb) + " MB)"
+                }
+                setMode("file")
+                Toast.makeText(this, "Drama video ready ✓ Choose recap settings and press START", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, "Imported video file was not found", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_home)
@@ -81,6 +99,8 @@ class HomeActivity : AppCompatActivity() {
             linkInput.setText(shared.trim())
             setMode("youtube")
             Toast.makeText(this, L.s(this@HomeActivity, "YouTube link ရပါပြီ - START နှိပ်ပါ", "YouTube link ready - press START"), Toast.LENGTH_LONG).show()
+        } else if (!shared.isNullOrBlank() && (shared.trim().startsWith("https://") || shared.trim().startsWith("http://"))) {
+            openDramaBrowser.launch(Intent(this, DramaBrowserActivity::class.java).putExtra("page_url", shared.trim()))
         }
     }
 
@@ -104,7 +124,7 @@ class HomeActivity : AppCompatActivity() {
         tv.text = text
         tv.textSize = 13f
         tv.setTypeface(Typeface.create("sans-serif", Typeface.BOLD), Typeface.BOLD)
-        tv.setTextColor(Color.parseColor("#3DE8F8"))
+        tv.setTextColor(ThemePalette.highlight(this))
         tv.letterSpacing = 0.15f
         val p = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         p.bottomMargin = dp(10)
@@ -130,16 +150,16 @@ class HomeActivity : AppCompatActivity() {
         c.isClickable = true
         c.chipBackgroundColor = ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-            intArrayOf(Color.parseColor("#2A2410"), Color.parseColor("#10182C"))
+            intArrayOf(Color.parseColor("#17351B"), Color.parseColor("#10182C"))
         )
         c.chipStrokeWidth = dp(1).toFloat()
         c.chipStrokeColor = ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-            intArrayOf(Color.parseColor("#FFC940"), Color.parseColor("#223055"))
+            intArrayOf(ThemePalette.accent(this), Color.parseColor("#223055"))
         )
         c.setTextColor(ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-            intArrayOf(Color.parseColor("#FFC940"), Color.parseColor("#C9D2EC"))
+            intArrayOf(ThemePalette.accent(this), Color.parseColor("#C9D2EC"))
         ))
         return c
     }
@@ -168,7 +188,7 @@ class HomeActivity : AppCompatActivity() {
         head.text = "GIKOKO"
         head.textSize = 22f
         head.setTypeface(null, Typeface.BOLD)
-        head.setTextColor(Color.parseColor("#FFC940"))
+        head.setTextColor(ThemePalette.accent(this))
         head.letterSpacing = 0.2f
         head.setPadding(dp(12), dp(24), dp(12), dp(2))
         panel.addView(head)
@@ -176,7 +196,7 @@ class HomeActivity : AppCompatActivity() {
         val sub = TextView(this)
         sub.text = "ONE RECAP PRO"
         sub.textSize = 12f
-        sub.setTextColor(Color.parseColor("#3DE8F8"))
+        sub.setTextColor(ThemePalette.highlight(this))
         sub.letterSpacing = 0.25f
         sub.setPadding(dp(12), 0, dp(12), dp(16))
         panel.addView(sub)
@@ -187,6 +207,10 @@ class HomeActivity : AppCompatActivity() {
         panel.addView(divider, dp1)
 
         panel.addView(menuItem("🏠  Home") { drawer.closeDrawer(Gravity.START) })
+        panel.addView(menuItem("🌏  Chinese / Korean Drama Browser") {
+            drawer.closeDrawer(Gravity.START)
+            openDramaBrowser.launch(Intent(this, DramaBrowserActivity::class.java))
+        })
         panel.addView(menuItem("⚙️  Settings") {
             drawer.closeDrawer(Gravity.START)
             startActivity(Intent(this, SettingsActivity::class.java))
@@ -218,8 +242,8 @@ class HomeActivity : AppCompatActivity() {
         panel.addView(menuItem("ℹ️  About") {
             drawer.closeDrawer(Gravity.START)
             AlertDialog.Builder(this)
-                .setTitle("GIKOKO RECAP")
-                .setMessage("Version 2.0 (Pro)\n\nAI video recap - Myanmar voice + captions.\nGemini 3.8 Flash + Custom REST provider.\nDeveloped by I Ko Ko.")
+                .setTitle("G.I KO KO MOVIE RECAP STUDIO")
+                .setMessage("Movie Recap + Short Drama Studio\nGemini AI planning • On-device video composition • Subtitle and voice tools\nDeveloped by I Ko Ko.")
                 .setPositiveButton("OK", null)
                 .show()
         })
@@ -227,7 +251,7 @@ class HomeActivity : AppCompatActivity() {
         val followHead = TextView(this)
         followHead.text = "CONTACT"
         followHead.textSize = 11f
-        followHead.setTextColor(Color.parseColor("#3DE8F8"))
+        followHead.setTextColor(ThemePalette.highlight(this))
         followHead.letterSpacing = 0.2f
         followHead.setPadding(dp(12), dp(28), dp(12), dp(6))
         panel.addView(followHead)
@@ -304,7 +328,7 @@ class HomeActivity : AppCompatActivity() {
         if (key.isEmpty()) {
             val warn = TextView(this)
             warn.text = L.s(this@HomeActivity, "Gemini API key မထည့်ရသေးပါ", "Gemini API key not set yet")
-            warn.setTextColor(Color.parseColor("#FFC940"))
+            warn.setTextColor(ThemePalette.accent(this))
             warn.textSize = 15f
             warn.setTypeface(null, Typeface.BOLD)
             statusCard.addView(warn)
@@ -329,7 +353,7 @@ class HomeActivity : AppCompatActivity() {
         } else if (provider == "custom") {
             val ok = TextView(this)
             ok.text = "CUSTOM PROVIDER ✓ သင့်နေပါပြီ"
-            ok.setTextColor(Color.parseColor("#3DE8F8"))
+            ok.setTextColor(ThemePalette.highlight(this))
             ok.textSize = 15f
             ok.setTypeface(null, Typeface.BOLD)
             statusCard.addView(ok)
@@ -345,7 +369,7 @@ class HomeActivity : AppCompatActivity() {
         } else {
             val ok = TextView(this)
             ok.text = "GEMINI API ✓ သင့်နေပါပြီ"
-            ok.setTextColor(Color.parseColor("#3DE8F8"))
+            ok.setTextColor(ThemePalette.highlight(this))
             ok.textSize = 15f
             ok.setTypeface(null, Typeface.BOLD)
             statusCard.addView(ok)
@@ -370,7 +394,7 @@ class HomeActivity : AppCompatActivity() {
         root.addView(logo, lp)
 
         val tag = TextView(this)
-        tag.text = "ONE CLICK  \u2022  AI VIDEO RECAP"
+        tag.text = "MOVIE RECAP  \u2022  SHORT DRAMA STUDIO"
         tag.gravity = Gravity.CENTER
         tag.setTextColor(Color.parseColor("#8A93B2"))
         tag.textSize = 12f
@@ -398,6 +422,21 @@ class HomeActivity : AppCompatActivity() {
         modes.addView(ytB, mp1)
         modes.addView(fbB, mp2)
         c2.addView(modes)
+
+        val dramaBrowserBtn = Button(this)
+        dramaBrowserBtn.text = "🌏  CHINESE / KOREAN DRAMA BROWSER"
+        dramaBrowserBtn.isAllCaps = false
+        dramaBrowserBtn.textSize = 13f
+        dramaBrowserBtn.setTypeface(null, Typeface.BOLD)
+        dramaBrowserBtn.setTextColor(Color.parseColor("#0A0A00"))
+        dramaBrowserBtn.setBackgroundResource(R.drawable.bg_gold_btn)
+        dramaBrowserBtn.setPadding(dp(8), dp(13), dp(8), dp(13))
+        val browserLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        browserLp.topMargin = dp(10)
+        c2.addView(dramaBrowserBtn, browserLp)
+        dramaBrowserBtn.setOnClickListener {
+            openDramaBrowser.launch(Intent(this, DramaBrowserActivity::class.java))
+        }
 
         linkBox = LinearLayout(this)
         linkBox.orientation = LinearLayout.VERTICAL
@@ -598,7 +637,7 @@ class HomeActivity : AppCompatActivity() {
         root.addView(c5)
 
         val start = Button(this)
-        start.text = "ONE CLICK RECAP"
+        start.text = "START"
         start.isAllCaps = false
         start.textSize = 16f
         start.setTypeface(null, Typeface.BOLD)
@@ -623,7 +662,7 @@ class HomeActivity : AppCompatActivity() {
         beat.start()
 
         val ver = TextView(this)
-        ver.text = "GIkoko One Recap v0.0.1 Pro \u2022 powered by Gemini 3.8"
+        ver.text = "G.I KO KO MOVIE RECAP STUDIO \u2022 Powered By I KO KO"
         ver.gravity = Gravity.CENTER
         ver.setTextColor(Color.parseColor("#5A6480"))
         ver.textSize = 11f
@@ -723,7 +762,7 @@ class HomeActivity : AppCompatActivity() {
         if (yt != null && fb != null) {
             if (m == "youtube") {
                 yt.setBackgroundResource(R.drawable.bg_mode_card_selected)
-                yt.setTextColor(Color.parseColor("#FFC940"))
+                yt.setTextColor(ThemePalette.accent(this))
                 fb.setBackgroundResource(R.drawable.bg_mode_card)
                 fb.setTextColor(Color.parseColor("#C9D2EC"))
                 linkBox.visibility = View.VISIBLE
@@ -732,7 +771,7 @@ class HomeActivity : AppCompatActivity() {
                 yt.setBackgroundResource(R.drawable.bg_mode_card)
                 yt.setTextColor(Color.parseColor("#C9D2EC"))
                 fb.setBackgroundResource(R.drawable.bg_mode_card_selected)
-                fb.setTextColor(Color.parseColor("#FFC940"))
+                fb.setTextColor(ThemePalette.accent(this))
                 linkBox.visibility = View.GONE
                 fileBox.visibility = View.VISIBLE
             }

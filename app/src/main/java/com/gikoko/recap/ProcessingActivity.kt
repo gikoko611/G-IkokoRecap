@@ -114,13 +114,9 @@ class ProcessingActivity : AppCompatActivity() {
         stallWarns = 0
         if (p < lastProg) return
         lastProg = p
-        if (p == 18) {
-            bar.setProgressSlow(43, 75000L)
-        } else if (p == 68 || p == 74) {
-            bar.setProgressSlow(94, 90000L)
-        } else {
-            bar.setProgress(p)
-        }
+        // Display only confirmed pipeline milestones. Never animate into a fake
+        // percentage while Gemini is still waiting for a response.
+        bar.setProgress(p)
     }
 
     private fun runPipeline() {

@@ -12,6 +12,7 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import okio.BufferedSink
 
 data class Segment(val startSec: Int, val endSec: Int, val text: String)
 data class RecapPlan(val title: String, val segments: List<Segment>, val chapters: List<String> = emptyList(), val quiz: List<String> = emptyList())
@@ -25,7 +26,8 @@ object GeminiClient {
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(300, TimeUnit.SECONDS)
-        .writeTimeout(300, TimeUnit.SECONDS)
+        .writeTimeout(10, TimeUnit.MINUTES)
+        .callTimeout(12, TimeUnit.MINUTES)
         .build()
 
     fun normalizeBase(url: String): String {
@@ -102,40 +104,136 @@ object GeminiClient {
         }
     }
 
+    private class ApiHttpException(val statusCode: Int, message: String) : IOException(message)
+
+    private const val MAX_RETRIES = 3
+
+    private fun isRetryableStatus(code: Int): Boolean =
+        code == 408 || code == 425 || code == 429 || code == 500 || code == 502 || code == 503 || code == 504
+
+    private fun retryDelayMs(attempt: Int, retryAfter: String? = null): Long {
+        val serverDelay = retryAfter?.trim()?.toLongOrNull()?.let { it.coerceIn(1L, 60L) * 1000L }
+        if (serverDelay != null) return serverDelay
+        val base = when (attempt) {
+            0 -> 2000L
+            1 -> 5000L
+            else -> 12000L
+        }
+        return base + java.util.concurrent.ThreadLocalRandom.current().nextLong(250L, 1251L)
+    }
+
+    private fun executeJson(req: Request, label: String): JSONObject {
+        var retries = 0
+        while (true) {
+            try {
+                val retryDelay = client.newCall(req).execute().use { resp ->
+                    val txt = resp.body?.string() ?: ""
+                    if (resp.isSuccessful) return JSONObject(txt)
+                    if (!isRetryableStatus(resp.code) || retries >= MAX_RETRIES) {
+                        throw ApiHttpException(resp.code, label + " HTTP " + resp.code + ": " + txt.take(600))
+                    }
+                    retryDelayMs(retries, resp.header("Retry-After"))
+                }
+                retries++
+                val seconds = retryDelay / 1000.0
+                Thread.sleep(retryDelay)
+            } catch (e: ApiHttpException) {
+                throw e
+            } catch (e: IOException) {
+                if (retries >= MAX_RETRIES) {
+                    throw IOException(label + " network failure after " + (retries + 1) + " attempts: " + (e.message ?: e.javaClass.simpleName), e)
+                }
+                val delay = retryDelayMs(retries)
+                retries++
+                Thread.sleep(delay)
+            }
+        }
+    }
+
+    fun isTransientFailure(error: Throwable): Boolean {
+        var current: Throwable? = error
+        while (current != null) {
+            if (current is ApiHttpException && isRetryableStatus(current.statusCode)) return true
+            if (current is java.net.SocketTimeoutException ||
+                current is java.net.UnknownHostException ||
+                current is java.net.ConnectException ||
+                current is java.net.SocketException) return true
+            val message = current.message.orEmpty().lowercase()
+            if (message.contains("http 408") || message.contains("http 425") ||
+                message.contains("http 429") || message.contains("http 500") ||
+                message.contains("http 502") || message.contains("http 503") ||
+                message.contains("http 504") || message.contains("timeout") ||
+                message.contains("connection reset") || message.contains("unable to resolve host")) return true
+            current = current.cause
+        }
+        return false
+    }
+
+    private fun httpStatus(error: Throwable): Int? {
+        var current: Throwable? = error
+        while (current != null) {
+            if (current is ApiHttpException) return current.statusCode
+            val match = Regex("HTTP\\s+(\\d{3})", RegexOption.IGNORE_CASE).find(current.message.orEmpty())
+            if (match != null) return match.groupValues[1].toIntOrNull()
+            current = current.cause
+        }
+        return null
+    }
+
+    private fun findAvailableFlashFallback(apiKey: String, currentModel: String): String? {
+        return runCatching {
+            val models = get(apiKey, "/v1beta/models").optJSONArray("models") ?: JSONArray()
+            val available = HashSet<String>()
+            for (i in 0 until models.length()) {
+                val item = models.optJSONObject(i) ?: continue
+                val name = item.optString("name", "").removePrefix("models/")
+                val methods = item.optJSONArray("supportedGenerationMethods") ?: JSONArray()
+                val supportsGenerate = (0 until methods.length()).any { methods.optString(it) == "generateContent" }
+                if (supportsGenerate && name.startsWith("gemini-") &&
+                    name.contains("flash") && !name.contains("tts") &&
+                    !name.contains("image") && !name.contains("live") &&
+                    !name.contains("transcribe") && name != currentModel) {
+                    available.add(name)
+                }
+            }
+            val preference = listOf(
+                "gemini-3.7-flash",
+                "gemini-3.6-flash",
+                "gemini-3.5-flash",
+                "gemini-3.5-flash-lite",
+                "gemini-3.1-flash-lite",
+                "gemini-2.5-flash",
+                "gemini-2.5-flash-lite"
+            )
+            preference.firstOrNull { it in available } ?: available.sorted().firstOrNull()
+        }.getOrNull()
+    }
+
     private fun post(apiKey: String, path: String, body: String): JSONObject {
         val req = Request.Builder()
             .url(BASE + path + "?key=" + apiKey)
             .post(body.toRequestBody(JSON_MEDIA))
             .build()
-        var attempt = 0
-        while (true) {
-            client.newCall(req).execute().use { resp ->
-                val txt = resp.body?.string() ?: ""
-                if (resp.isSuccessful) return JSONObject(txt)
-                val retriable = resp.code >= 500 || resp.code == 429
-                if (!retriable || attempt >= 2) throw IOException("HTTP " + resp.code + ": " + txt.take(600))
-                attempt++
-            }
-            Thread.sleep(3000L * attempt)
-        }
+        return executeJson(req, "Gemini request")
     }
 
     private fun get(apiKey: String, path: String): JSONObject {
         val req = Request.Builder().url(BASE + path + "?key=" + apiKey).get().build()
-        var attempt = 0
-        while (true) {
-            client.newCall(req).execute().use { resp ->
-                val txt = resp.body?.string() ?: ""
-                if (resp.isSuccessful) return JSONObject(txt)
-                val retriable = resp.code >= 500 || resp.code == 429
-                if (!retriable || attempt >= 2) throw IOException("HTTP " + resp.code + ": " + txt.take(400))
-                attempt++
-            }
-            Thread.sleep(3000L * attempt)
-        }
+        return executeJson(req, "Gemini GET")
     }
 
-    fun uploadVideo(apiKey: String, file: File, mime: String, displayName: String): String {
+    fun uploadVideo(
+        apiKey: String,
+        file: File,
+        mime: String,
+        displayName: String,
+        onLog: (String) -> Unit = {}
+    ): String {
+        if (!file.exists() || !file.isFile || file.length() <= 0L) {
+            throw IOException("Video file မရှိပါ သို့မဟုတ် empty ဖြစ်နေသည်")
+        }
+        val totalBytes = file.length()
+        onLog("Upload preparing: " + String.format(java.util.Locale.US, "%.1f MB", totalBytes / (1024.0 * 1024.0)))
         val meta = JSONObject().put("file", JSONObject().put("display_name", displayName)).toString()
         val startReq = Request.Builder()
             .url(BASE + "/upload/v1beta/files?key=" + apiKey)
@@ -152,41 +250,82 @@ object GeminiClient {
             uploadUrl = resp.header("X-Goog-Upload-URL")
                 ?: throw IOException("No upload URL returned")
         }
-        val upReq = Request.Builder()
-            .url(uploadUrl)
-            .header("X-Goog-Upload-Command", "upload, finalize")
-            .header("X-Goog-Upload-Offset", "0")
-            .header("Content-Type", mime)
-            .put(file.asRequestBody(mime.toMediaType()))
-            .build()
-        client.newCall(upReq).execute().use { resp ->
-            val txt = resp.body?.string() ?: ""
-            if (!resp.isSuccessful) throw IOException("Upload failed HTTP " + resp.code + ": " + txt.take(400))
-            val j = JSONObject(txt)
-            val fileObj = j.optJSONObject("file") ?: j
-            val name = fileObj.optString("name", "")
-            if (name.isEmpty()) throw IOException("Upload response missing file name: " + txt.take(200))
-            return name
+        // Adaptive Gemini resumable upload: 100 KiB to 1 MiB.
+        // Increase the chunk after fast acknowledged transfers; decrease it on slow transfers.
+        // The Gemini File API sample uses a configurable chunk size; keep each request modest
+        // for low-memory Android devices and unstable mobile networks.
+        val minChunkSize = 100 * 1024
+        val maxChunkSize = 1024 * 1024
+        var chunkSize = 256 * 1024
+        var offset = 0L
+        var fileName = ""
+        var chunkNumber = 0
+        java.io.RandomAccessFile(file, "r").use { raf ->
+            while (offset < totalBytes) {
+                val count = minOf(chunkSize.toLong(), totalBytes - offset).toInt()
+                val bytes = ByteArray(count)
+                raf.seek(offset)
+                raf.readFully(bytes)
+                val isLast = offset + count >= totalBytes
+                val command = if (isLast) "upload, finalize" else "upload"
+                val chunkReq = Request.Builder()
+                    .url(uploadUrl)
+                    .header("Content-Length", count.toString())
+                    .header("X-Goog-Upload-Offset", offset.toString())
+                    .header("X-Goog-Upload-Command", command)
+                    .post(bytes.toRequestBody(mime.toMediaType()))
+                    .build()
+                val chunkStartedAt = System.nanoTime()
+                client.newCall(chunkReq).execute().use { resp ->
+                    val txt = resp.body?.string() ?: ""
+                    if (!resp.isSuccessful) {
+                        throw IOException("Gemini upload chunk ${chunkNumber + 1} failed HTTP ${resp.code}: " + txt.take(400))
+                    }
+                    if (isLast) {
+                        val j = JSONObject(txt)
+                        val fileObj = j.optJSONObject("file") ?: j
+                        fileName = fileObj.optString("name", "")
+                        if (fileName.isEmpty()) throw IOException("Upload response missing file name: " + txt.take(200))
+                    }
+                }
+                val elapsedMs = ((System.nanoTime() - chunkStartedAt) / 1_000_000L).coerceAtLeast(1L)
+                offset += count
+                chunkNumber++
+                if (elapsedMs < 2000L && chunkSize < maxChunkSize) {
+                    chunkSize = minOf(chunkSize + 100 * 1024, maxChunkSize)
+                } else if (elapsedMs > 8000L && chunkSize > minChunkSize) {
+                    chunkSize = maxOf(chunkSize - 100 * 1024, minChunkSize)
+                }
+                val percent = ((offset * 100L) / totalBytes).toInt().coerceIn(0, 100)
+                onLog("Upload acknowledged: " + percent + "% (" +
+                    String.format(java.util.Locale.US, "%.1f / %.1f MB", offset / (1024.0 * 1024.0), totalBytes / (1024.0 * 1024.0)) +
+                    ") - chunk " + chunkNumber + ", next " + (chunkSize / 1024) + " KB")
+            }
         }
+        return fileName
     }
 
     fun waitForFileReady(apiKey: String, fileName: String, onLog: (String) -> Unit): String {
-        var tries = 0
-        while (tries < 60) {
-            tries++
-            Thread.sleep(2000)
+        val startedAt = System.nanoTime()
+        val timeoutNanos = TimeUnit.MINUTES.toNanos(10)
+        while (System.nanoTime() - startedAt < timeoutNanos) {
             val j = get(apiKey, "/v1beta/" + fileName)
             val fo = j.optJSONObject("file") ?: j
-            val state = fo.optString("state", "")
-            onLog("File state: " + state)
+            val state = fo.optString("state", "STATE_UNSPECIFIED")
+            val elapsed = TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - startedAt)
+            onLog("Gemini processing: " + state + " (" + elapsed + "s)")
             if (state == "ACTIVE") {
                 var u = fo.optString("uri", "")
                 if (u.isEmpty()) u = BASE + "/v1beta/" + fileName
+                onLog("Video file ACTIVE - analysis စတင်နိုင်ပါပြီ")
                 return u
             }
-            if (state == "FAILED") throw IOException("Video processing failed on server")
+            if (state == "FAILED") {
+                throw IOException("Gemini က video processing ကို FAILED ပြန်ပေးသည်။ Video format/codec ကို စစ်ဆေးပါ။")
+            }
+            Thread.sleep(5000)
         }
-        throw IOException("Timeout waiting for video upload")
+        throw IOException("Gemini video processing 10 မိနစ်ကျော်ကြာနေသည်။ Upload ပြီးပါပြီ (" + fileName + ")၊ ထပ်စမ်းမီ network နှင့် Gemini File status ကို စစ်ဆေးပါ။")
     }
 
     private fun styleBrief(style: String, lang: String): String {
@@ -251,7 +390,15 @@ object GeminiClient {
         val body = JSONObject()
             .put("contents", JSONArray().put(content))
             .put("generationConfig", JSONObject().put("temperature", 0.4).put("response_mime_type", "application/json"))
-        val resp = post(apiKey, "/v1beta/models/" + model + ":generateContent", body.toString())
+        val requestBody = body.toString()
+        val resp = try {
+            post(apiKey, "/v1beta/models/" + model + ":generateContent", requestBody)
+        } catch (e: IOException) {
+            if (httpStatus(e) != 503) throw e
+            val fallbackModel = findAvailableFlashFallback(apiKey, model) ?: throw e
+            onLog("MODEL FAILOVER: " + model + " is overloaded; trying API-listed model " + fallbackModel)
+            post(apiKey, "/v1beta/models/" + fallbackModel + ":generateContent", requestBody)
+        }
         val txt = resp.getJSONArray("candidates").getJSONObject(0)
             .getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
         onLog("Plan: " + txt.take(300))

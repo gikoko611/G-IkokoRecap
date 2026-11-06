@@ -69,7 +69,7 @@ class ToolsActivity : AppCompatActivity() {
         tv.text = text
         tv.textSize = 13f
         tv.setTypeface(Typeface.create("sans-serif", Typeface.BOLD), Typeface.BOLD)
-        tv.setTextColor(Color.parseColor("#3DE8F8"))
+        tv.setTextColor(ThemePalette.highlight(this))
         tv.letterSpacing = 0.15f
         val p = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         p.bottomMargin = dp(10)
@@ -103,16 +103,16 @@ class ToolsActivity : AppCompatActivity() {
         c.isClickable = true
         c.chipBackgroundColor = android.content.res.ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-            intArrayOf(Color.parseColor("#2A2410"), Color.parseColor("#10182C"))
+            intArrayOf(Color.parseColor("#17351B"), Color.parseColor("#10182C"))
         )
         c.chipStrokeWidth = dp(1).toFloat()
         c.chipStrokeColor = android.content.res.ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-            intArrayOf(Color.parseColor("#FFC940"), Color.parseColor("#223055"))
+            intArrayOf(ThemePalette.accent(this), Color.parseColor("#223055"))
         )
         c.setTextColor(android.content.res.ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-            intArrayOf(Color.parseColor("#FFC940"), Color.parseColor("#C9D2EC"))
+            intArrayOf(ThemePalette.accent(this), Color.parseColor("#C9D2EC"))
         ))
         return c
     }
@@ -173,7 +173,7 @@ class ToolsActivity : AppCompatActivity() {
         t.text = label
         t.textSize = 12f
         t.setTypeface(null, Typeface.BOLD)
-        t.setTextColor(Color.parseColor("#FFC940"))
+        t.setTextColor(ThemePalette.accent(this))
         t.gravity = Gravity.CENTER
         val tp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         tp.topMargin = dp(6)
@@ -252,7 +252,7 @@ class ToolsActivity : AppCompatActivity() {
         val back = TextView(this)
         back.text = "‹"
         back.textSize = 30f
-        back.setTextColor(Color.parseColor("#FFC940"))
+        back.setTextColor(ThemePalette.accent(this))
         back.setPadding(dp(16), dp(4), dp(16), dp(4))
         back.setOnClickListener { finish() }
         head.addView(back)
@@ -261,7 +261,7 @@ class ToolsActivity : AppCompatActivity() {
         ht.text = "TOOLS"
         ht.textSize = 18f
         ht.setTypeface(null, Typeface.BOLD)
-        ht.setTextColor(Color.parseColor("#FFC940"))
+        ht.setTextColor(ThemePalette.accent(this))
         ht.letterSpacing = 0.2f
         head.addView(ht)
 

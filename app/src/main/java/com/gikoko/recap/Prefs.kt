@@ -40,6 +40,7 @@ object Prefs {
     const val KEY_WM_LOGO = "wm_logo"
     const val KEY_THEME = "recap_theme"
     const val KEY_UI_LANG = "ui_lang"
+    const val KEY_UI_THEME = "ui_theme"
     const val KEY_PLAN_CONFIRM = "plan_confirm"
     const val KEY_U_DATE = "usage_date"
     const val KEY_U_PLAN = "usage_plan"
@@ -159,6 +160,7 @@ object Prefs {
     fun wmLogo(ctx: Context): String = str(ctx, KEY_WM_LOGO, "")
     fun theme(ctx: Context): String = str(ctx, KEY_THEME, "gold")
     fun uiLang(ctx: Context): String = str(ctx, KEY_UI_LANG, "mm")
+    fun uiTheme(ctx: Context): String = str(ctx, KEY_UI_THEME, "neon")
     fun planConfirm(ctx: Context): Boolean = bool(ctx, KEY_PLAN_CONFIRM, true)
 
     fun shorts(ctx: Context): Boolean = bool(ctx, KEY_SHORTS, false)

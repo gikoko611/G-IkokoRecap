@@ -1,63 +1,65 @@
-# GIkoko One Recap (Pro v2.0)
+# G.I KO KO MOVIE RECAP STUDIO
 
-AI video recap app - YouTube link ဒါမှမဟုတ် ဖုန်းထဲက video file ကနေ **အရေးကြီးတဲ့ အပိုင်းတွေချုံ**၊ မြန်မာ AI အသံ + မြန်မာစာတန်းထိုးနဲ့ တစ်ပွင့်တည်း recap video လုပ်ပေးတဲ့ Android app။
+**Powered By I KO KO** · Android 10+ · ARMv7 target · Gemini AI + On-device Video Studio
 
-## Features (Pro v2.0)
+G.I KO KO MOVIE RECAP STUDIO combines the existing Movie Recap workflow and its editing tools into one organized Android studio. Gemini handles supported cloud AI tasks; the phone handles video composition and export locally wherever device resources allow.
 
-- YouTube link နဲ့ recap (Gemini က video ကိုတိုက်ရိုက်လုပ်ဆောင်)
-- ဖုန်းထဲက video file upload (MP4/MOV/MKV/WebM/AVI/3GP) - Facebook/TikTok video တွေအတွက်
-- Myanmar AI voice မျိုးစုံ (Puck, Charon, Fenrir, Kore ... 12 မျိုး)
-- အသံ PREVIEW - မရွေးခင် စမ်းနားထောင်နိုင်
-- မြန်မာစာတန်းထိုး (SRT) အလိုအလျောက်ထွက်
-- Recap အချိန် ရွေးနိုင် - Auto / 1 / 3 / 5 မိနစ်
-- Segments mode - Compact (4-6) သို့ Full (6-12)
-- Narration ဘာသာ - မြန်မာ / English
-- Video quality - 720p / 1080p
-- Watermark ထည့်/ပယ်ဖျက်နိုင်
-- Intro / Outro branded card များ
-- Auto-save to Downloads (သော့ဖွင့်နိုင်)
-- History - လုပ်ခဲ့တဲ့ recap အားလုံး ပြန်ကြည့် / ပြန်ဖွင့် / မျှဝေ / ဖျက်
-- Settings page - API key ထည့်/စစ်ဆေး၊ model ရွေး (gemini-2.5-flash / gemini-2.0-flash)
-- Left drawer menu (ဘယ်ဘက်နှိပ် ဆွဲ)
-- Haptic feedback
-- Cache ရှင်းလင်းမှု
-- Share - Video / SRT / Text summary
-- Retry on error
-- Signed release APK (install မလုပ်နိုင်တာ ပြေလည်)
+## Core architecture
+- **Gemini API (cloud AI):** video understanding where supported, recap planning, narration scripts, translation and structured subtitle text.
+- **On-device rendering:** the current app uses AndroidX Media3 Transformer for local video composition, overlays and export. This is not a separate cloud render server.
+- **Voice:** Gemini TTS and optional Edge TTS integration, depending on settings and network availability.
+- **Local tools:** subtitle burn-in, SRT workflows, watermark/logo overlays, video merge, crop/portrait tools, compression, slideshow, voice-over and BGM tools.
+- **Build:** GitHub Actions builds the Android APK; GitHub is the source/build host, not the runtime rendering cloud.
 
-## Gemini API Key
+## Existing features retained
+- YouTube URL and local video-file recap entry points.
+- Gemini video upload/analysis and recap planning.
+- Recap duration, segment density, narration style and language options.
+- Multiple Gemini voice choices, voice preview, speed controls and captions.
+- Landscape 16:9 and vertical 9:16 output options.
+- Intro/outro, watermark/logo options and BGM controls.
+- Plan confirmation, transcript/ASR fallback settings and custom OpenAI-compatible provider settings.
+- History, queue, result sharing, retry and saved outputs.
+- Tools: Studio, Voice Lab, History, Crash Log, Watermark tools, SRT Export, Thumbnail Maker, AI Studio, Video Queue, Merger, Gallery, Cleaner, Video Lab, Text Recap, Slideshow, Voice-over, BGM Library, Compress, Subtitle Burn, Portrait and Watermark Burn.
+- Settings for API keys, models, TTS engine, themes, language and usage tracking.
 
-1. https://aistudio.google.com/apikey မှာ အကောင့်ဝင်ပြီး API key တစ်ခု ဖန်တီးပါ
-2. App ထဲမှာ ဘယ်ဘက် ≡ ကိုနှိပ် → Settings → API key ထည့် → SAVE → TEST KEY
-3. 403 error ပေါ်ရင် - key မှားနေတာ ဒါမှမဟုတ် region block ဖြစ်နေတာပါ (VPN သုံးပြီး စမ်းကြည့်ပါ)
+## Primary workflow
+1. Select a YouTube link or a video file you own or are authorized to edit.
+2. Choose recap length, segments, aspect ratio, narration style, voice and captions.
+3. Press **START**.
+4. Gemini performs the supported AI planning tasks.
+5. The app composes the result on the Android device using Media3 Transformer.
+6. Review, share or save the exported video and subtitle files.
 
-## Download APK
+## Device and rendering notes
+- Target compatibility: Android 10 and 32-bit ARMv7 (armeabi-v7a) devices.
+- The Redmi 9A has limited memory and thermal headroom. 480p/720p and shorter projects are recommended; 1080p may be slow or fail depending on source codec, storage and device temperature.
+- Hardware encoding is device/codec dependent. The app must fall back to supported software paths where available.
+- Local rendering requires free storage and battery/thermal headroom. Keep the app active during long exports if background execution is restricted.
+- AI video upload and cloud analysis still require internet and are subject to Gemini API quotas, model availability and file limits.
+- Offline editing is limited to tools that do not require a cloud AI/TTS request.
 
-CI အလိုအလျောက် build လုပ်ပြီး signed APK release တင်ပေးမယ် -
-https://github.com/gikoko611/G-IkokoRecap/releases
+## Roadmap — additions, not claims of current availability
+- A dedicated Local/Auto render selector and render diagnostics.
+- Better job persistence, pause/resume and low-memory safeguards.
+- Unified Short Drama workflow, subtitle styling/editor, episode continuity and batch project management.
+- Optional AI lip-sync and advanced enhancement through separately configured providers.
+- More robust local media processing and device-specific performance testing.
 
-GIkokoOneRecap-release.apk ကို ရွေးချယ်ပါ။
+## API key setup
+1. Create a Gemini API key at https://aistudio.google.com/apikey.
+2. Open the app's Settings and enter the key.
+3. Use the key test function before starting an AI recap.
+4. Keep the key private. Do not publish it in screenshots, source code or public issue reports.
 
-## Icon / Logo အစားထိုးခြင်း (စိတကြိုက်ပုံနဲ့)
+Gemini API pricing and quotas vary by model and account: https://ai.google.dev/gemini-api/docs/pricing
 
-App icon နဲ့ logo ဟာ vector placeholder တွေပါ။ ကိုယ်ပိုင် JPEG ပုံတွေနဲ့ အစားထိုးချင်ရင် -
+## Copyright and content permissions
+Only import, edit, remove or replace watermarks on videos you own or are authorized to modify. Do not bypass DRM, login requirements, platform download restrictions or creator attribution.
 
-1. GitHub web မှာ ဒီ repo ကိုဖွင့်ပါ
-2. app/src/main/res/drawable-nodpi/ folder အသစ်တည်ဆောက်ပါ (Add file → Create new file မှာ path ရိုက်)
-3. ပုံဖိုင်တွေကို upload ပြီး နာမည်တွေကို ဒီအတိုင်းပေးပါ -
-   - app_icon.jpg (512x512, square)
-   - app_logo.jpg (1280x720, 16:9)
-4. ပုံတွေကို အသုံးချချင်ရင် layout တွေထဲမှာ ImageView src အနေနဲ့ ညွှန်းပါ
-
-Vector drawables (ic_monogram.xml, img_splash_logo.xml) က gold/black cyber style နဲ့ ကိုယ်တိုင်ဆွဲထားတာပါ။
-
-## Tech
-
-- Kotlin, AndroidX, Material Components
-- Google Gemini API (generateContent + TTS)
-- Media3 Transformer (video composition + overlays)
-- GitHub Actions CI (signed APK auto-release)
+## Build
+GitHub Actions workflow: .github/workflows/android-build.yml
+Repository: https://github.com/gikoko611/G-IkokoRecap
 
 ## Developer
-
-I Ko Ko - GIkoko One Recap
+I Ko Ko — **Powered By I KO KO**
