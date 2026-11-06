@@ -205,6 +205,9 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         val paths = JSONArray(queueFile.readText())
         if (paths.length() == 0) throw IOException("Queue ဗလာဖြစ်နေပါသည်။")
         val series = inputData.getBoolean(KEY_QUEUE_SERIES, false)
+        val stateFile = File(queueFile.parentFile, queueFile.name + ".state.json")
+        val state = runCatching { if (stateFile.exists()) JSONObject(stateFile.readText()) else JSONObject() }.getOrDefault(JSONObject())
+        val savedItems = state.optJSONObject("items") ?: JSONObject()
         var previousSummary = ""
         var completed = 0
         var failed = 0
@@ -213,6 +216,26 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
 
         for (i in 0 until paths.length()) {
             val file = File(paths.getString(i))
+            val saved = savedItems.optJSONObject(i.toString())
+            if (saved?.optBoolean("success", false) == true) {
+                val savedVideo = File(saved.optString("video", ""))
+                if (savedVideo.exists()) {
+                    lastArchived = Archived(
+                        savedVideo,
+                        File(saved.optString("srt", "")),
+                        saved.optString("title", "Recap"),
+                        saved.optString("summary", ""),
+                        File(saved.optString("thumb", "")),
+                        saved.optString("short", "").takeIf { it.isNotEmpty() }?.let { File(it) },
+                        saved.optString("podcast", "").takeIf { it.isNotEmpty() }?.let { File(it) }
+                    )
+                    completed++
+                    previousSummary = saved.optString("series_summary", "")
+                    appendLog("QUEUE RESUME: reused completed item " + (i + 1) + "/" + paths.length())
+                    publishProgress((((i + 1).toDouble() / paths.length()) * 95.0).toInt())
+                    continue
+                }
+            }
             publish("Queue item " + (i + 1) + "/" + paths.length(), "Processing " + file.name)
             val cfg = RecapConfigFactory.fromPrefs(applicationContext, if (series) previousSummary else "", false)
             try {
@@ -226,7 +249,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                         publishProgress(overall)
                     }
                 )
-                lastArchived = archiveOutput(out, "file", file.absolutePath, forceAutosave = true)
+                val archived = archiveOutput(out, "file", file.absolutePath, forceAutosave = true)
                 completed++
                 if (series) {
                     var summary = out.summary
@@ -235,6 +258,26 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                     if (summary.length > 700) summary = summary.takeLast(700)
                     previousSummary = summary
                 }
+                val itemState = JSONObject()
+                    .put("success", true)
+                    .put("video", archived.video.absolutePath)
+                    .put("srt", archived.srt.absolutePath)
+                    .put("title", archived.title)
+                    .put("summary", archived.summary)
+                    .put("thumb", if (archived.thumb.exists()) archived.thumb.absolutePath else "")
+                    .put("short", archived.shortFile?.absolutePath ?: "")
+                    .put("podcast", archived.podcast?.absolutePath ?: "")
+                    .put("series_summary", previousSummary)
+                savedItems.put(i.toString(), itemState)
+                state.put("items", savedItems)
+                val tempState = File(stateFile.parentFile, stateFile.name + ".tmp")
+                tempState.writeText(state.toString())
+                if (stateFile.exists()) stateFile.delete()
+                if (!tempState.renameTo(stateFile)) {
+                    tempState.copyTo(stateFile, overwrite = true)
+                    tempState.delete()
+                }
+                lastArchived = archived
                 appendLog("QUEUE SUCCESS: " + file.name)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -244,13 +287,15 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 appendLog("QUEUE ITEM FAILED: " + file.name + " — " + (e.message ?: e.javaClass.simpleName))
             }
         }
-        queueFile.delete()
         if (completed == 0) throw lastFailure ?: IOException("Queue ထဲက Video တစ်ခုမှ မအောင်မြင်ပါ။")
+        queueFile.delete()
+        stateFile.delete()
         val final = lastArchived!!.copy(
             summary = lastArchived!!.summary + "\n\nQUEUE REPORT\nCompleted: " + completed + "/" + paths.length() + "\nFailed: " + failed
         )
         progressValue = 100
         publish("Queue completed", "Completed " + completed + "; failed " + failed)
+        postCompletionNotification("Queue completed", "Completed " + completed + " / " + paths.length())
         return successData(final, "")
     }
 
