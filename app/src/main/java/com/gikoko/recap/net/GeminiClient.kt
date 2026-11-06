@@ -165,48 +165,49 @@ object GeminiClient {
             uploadUrl = resp.header("X-Goog-Upload-URL")
                 ?: throw IOException("No upload URL returned")
         }
-        var lastLoggedPercent = -1
-        var lastLogAt = System.nanoTime()
-        val progressBody = object : okhttp3.RequestBody() {
-            override fun contentType() = mime.toMediaType()
-            override fun contentLength() = totalBytes
-            override fun writeTo(sink: BufferedSink) {
-                val buffer = ByteArray(64 * 1024)
-                var sent = 0L
-                file.inputStream().buffered().use { input ->
-                    while (true) {
-                        val read = input.read(buffer)
-                        if (read < 0) break
-                        sink.write(buffer, 0, read)
-                        sent += read
-                        val percent = ((sent * 100L) / totalBytes).toInt().coerceIn(0, 100)
-                        val now = System.nanoTime()
-                        if (percent >= lastLoggedPercent + 5 || now - lastLogAt >= TimeUnit.SECONDS.toNanos(10) || sent == totalBytes) {
-                            onLog("Upload progress: " + percent + "% (" +
-                                String.format(java.util.Locale.US, "%.1f / %.1f MB", sent / (1024.0 * 1024.0), totalBytes / (1024.0 * 1024.0)) + ")")
-                            lastLoggedPercent = percent
-                            lastLogAt = now
-                        }
+        // Gemini resumable File API accepts media chunks via POST (not PUT).
+        // Small chunks let slow mobile connections make acknowledged progress.
+        val chunkSize = 2 * 1024 * 1024
+        var offset = 0L
+        var fileName = ""
+        var chunkNumber = 0
+        val totalChunks = ((totalBytes + chunkSize - 1) / chunkSize).toInt()
+        java.io.RandomAccessFile(file, "r").use { raf ->
+            while (offset < totalBytes) {
+                val count = minOf(chunkSize.toLong(), totalBytes - offset).toInt()
+                val bytes = ByteArray(count)
+                raf.seek(offset)
+                raf.readFully(bytes)
+                val isLast = offset + count >= totalBytes
+                val command = if (isLast) "upload, finalize" else "upload"
+                val chunkReq = Request.Builder()
+                    .url(uploadUrl)
+                    .header("Content-Length", count.toString())
+                    .header("X-Goog-Upload-Offset", offset.toString())
+                    .header("X-Goog-Upload-Command", command)
+                    .post(bytes.toRequestBody(mime.toMediaType()))
+                    .build()
+                client.newCall(chunkReq).execute().use { resp ->
+                    val txt = resp.body?.string() ?: ""
+                    if (!resp.isSuccessful) {
+                        throw IOException("Gemini upload chunk ${chunkNumber + 1}/${totalChunks} failed HTTP ${resp.code}: " + txt.take(400))
+                    }
+                    if (isLast) {
+                        val j = JSONObject(txt)
+                        val fileObj = j.optJSONObject("file") ?: j
+                        fileName = fileObj.optString("name", "")
+                        if (fileName.isEmpty()) throw IOException("Upload response missing file name: " + txt.take(200))
                     }
                 }
+                offset += count
+                chunkNumber++
+                val percent = ((offset * 100L) / totalBytes).toInt().coerceIn(0, 100)
+                onLog("Upload acknowledged: " + percent + "% (" +
+                    String.format(java.util.Locale.US, "%.1f / %.1f MB", offset / (1024.0 * 1024.0), totalBytes / (1024.0 * 1024.0)) +
+                    ") - chunk " + chunkNumber + "/" + totalChunks)
             }
         }
-        val upReq = Request.Builder()
-            .url(uploadUrl)
-            .header("X-Goog-Upload-Command", "upload, finalize")
-            .header("X-Goog-Upload-Offset", "0")
-            .header("Content-Type", mime)
-            .put(progressBody)
-            .build()
-        client.newCall(upReq).execute().use { resp ->
-            val txt = resp.body?.string() ?: ""
-            if (!resp.isSuccessful) throw IOException("Upload failed HTTP " + resp.code + ": " + txt.take(400))
-            val j = JSONObject(txt)
-            val fileObj = j.optJSONObject("file") ?: j
-            val name = fileObj.optString("name", "")
-            if (name.isEmpty()) throw IOException("Upload response missing file name: " + txt.take(200))
-            return name
-        }
+        return fileName
     }
 
     fun waitForFileReady(apiKey: String, fileName: String, onLog: (String) -> Unit): String {
