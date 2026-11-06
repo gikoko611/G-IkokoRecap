@@ -1,4 +1,4 @@
-# GIkoko One Recap (Pro v2.0)
+# G.I KO KO RECAP STUDIO (v0.0.2)
 
 AI video recap app - YouTube link ဒါမှမဟုတ် ဖုန်းထဲက video file ကနေ **အရေးကြီးတဲ့ အပိုင်းတွေချုံ**၊ မြန်မာ AI အသံ + မြန်မာစာတန်းထိုးနဲ့ တစ်ပွင့်တည်း recap video လုပ်ပေးတဲ့ Android app။
 
@@ -31,12 +31,22 @@ AI video recap app - YouTube link ဒါမှမဟုတ် ဖုန်းထ
 2. App ထဲမှာ ဘယ်ဘက် ≡ ကိုနှိပ် → Settings → API key ထည့် → SAVE → TEST KEY
 3. 403 error ပေါ်ရင် - key မှားနေတာ ဒါမှမဟုတ် region block ဖြစ်နေတာပါ (VPN သုံးပြီး စမ်းကြည့်ပါ)
 
+## UI Themes
+
+Choose one of three app accent themes in Settings → APP UI THEME: Neon Emerald (default), Cyber Blue, or Violet Pulse. The original launcher icon and splash logo are preserved. The visual direction uses a dark cyber base with bright neon accents.
+
+## About & Contact
+
+- Facebook: https://www.facebook.com/profile.php?id=61592311041041
+- Gmail: gikoko611@gmail.com
+- GitHub: https://github.com/gikoko611
+
 ## Download APK
 
 CI အလိုအလျောက် build လုပ်ပြီး signed APK release တင်ပေးမယ် -
 https://github.com/gikoko611/G-IkokoRecap/releases
 
-GIkokoOneRecap-release.apk ကို ရွေးချယ်ပါ။
+GIKOKO-RECAP-release.apk ကို ရွေးချယ်ပါ။
 
 ## Icon / Logo အစားထိုးခြင်း (စိတကြိုက်ပုံနဲ့)
 
