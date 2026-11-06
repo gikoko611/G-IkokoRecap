@@ -30,8 +30,12 @@ object PlanCheckpoint {
         val settings = listOf(
             source,
             cfg.provider,
+            cfg.baseUrl,
             cfg.model,
             cfg.customModel,
+            cfg.extBase,
+            cfg.extModel,
+            cfg.transcriptMode.toString(),
             cfg.targetMinutes.toString(),
             cfg.lang,
             cfg.fullSegments.toString(),
