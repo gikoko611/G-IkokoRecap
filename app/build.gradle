@@ -16,13 +16,16 @@ android {
     }
 
     def ksFile = file('ci.keystore')
+    def ksStorePassword = System.getenv('ANDROID_KEYSTORE_PASSWORD') ?: 'gikoko2026'
+    def ksKeyAlias = System.getenv('ANDROID_KEY_ALIAS') ?: 'gikoko'
+    def ksKeyPassword = System.getenv('ANDROID_KEY_PASSWORD') ?: 'gikoko2026'
     signingConfigs {
         ci {
             if (ksFile.exists()) {
                 storeFile ksFile
-                storePassword 'gikoko2026'
-                keyAlias 'gikoko'
-                keyPassword 'gikoko2026'
+                storePassword ksStorePassword
+                keyAlias ksKeyAlias
+                keyPassword ksKeyPassword
             }
         }
     }
