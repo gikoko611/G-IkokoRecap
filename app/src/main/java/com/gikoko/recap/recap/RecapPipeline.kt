@@ -489,7 +489,7 @@ object RecapPipeline {
             val ev = if (cfg.dialogue && i % 2 == 1) Tts.secondEdgeVoice(context) else Tts.defaultEdgeVoice(context)
             val cacheKey = sha256(
                 segs[i].text + "|" + voice + "|" + ev + "|" + cfg.speed + "|" +
-                    cfg.lang + "|" + Prefs.ttsEngine(context)
+                    cfg.lang + "|" + Prefs.ttsEngine(context) + "|" + GeminiClient.TTS_MODEL
             )
             val f = File(ttsCache, cacheKey + ".wav")
             val cached = f.exists() && f.length() > 44L && runCatching {
