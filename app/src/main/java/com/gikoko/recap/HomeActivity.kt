@@ -104,7 +104,7 @@ class HomeActivity : AppCompatActivity() {
         tv.text = text
         tv.textSize = 13f
         tv.setTypeface(Typeface.create("sans-serif", Typeface.BOLD), Typeface.BOLD)
-        tv.setTextColor(Color.parseColor("#B6FF00"))
+        tv.setTextColor(ThemePalette.highlight(this))
         tv.letterSpacing = 0.15f
         val p = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         p.bottomMargin = dp(10)
@@ -135,11 +135,11 @@ class HomeActivity : AppCompatActivity() {
         c.chipStrokeWidth = dp(1).toFloat()
         c.chipStrokeColor = ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-            intArrayOf(Color.parseColor("#39FF14"), Color.parseColor("#223055"))
+            intArrayOf(ThemePalette.accent(this), Color.parseColor("#223055"))
         )
         c.setTextColor(ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-            intArrayOf(Color.parseColor("#39FF14"), Color.parseColor("#C9D2EC"))
+            intArrayOf(ThemePalette.accent(this), Color.parseColor("#C9D2EC"))
         ))
         return c
     }
@@ -168,7 +168,7 @@ class HomeActivity : AppCompatActivity() {
         head.text = "GIKOKO"
         head.textSize = 22f
         head.setTypeface(null, Typeface.BOLD)
-        head.setTextColor(Color.parseColor("#39FF14"))
+        head.setTextColor(ThemePalette.accent(this))
         head.letterSpacing = 0.2f
         head.setPadding(dp(12), dp(24), dp(12), dp(2))
         panel.addView(head)
@@ -176,7 +176,7 @@ class HomeActivity : AppCompatActivity() {
         val sub = TextView(this)
         sub.text = "ONE RECAP PRO"
         sub.textSize = 12f
-        sub.setTextColor(Color.parseColor("#B6FF00"))
+        sub.setTextColor(ThemePalette.highlight(this))
         sub.letterSpacing = 0.25f
         sub.setPadding(dp(12), 0, dp(12), dp(16))
         panel.addView(sub)
@@ -227,7 +227,7 @@ class HomeActivity : AppCompatActivity() {
         val followHead = TextView(this)
         followHead.text = "CONTACT"
         followHead.textSize = 11f
-        followHead.setTextColor(Color.parseColor("#B6FF00"))
+        followHead.setTextColor(ThemePalette.highlight(this))
         followHead.letterSpacing = 0.2f
         followHead.setPadding(dp(12), dp(28), dp(12), dp(6))
         panel.addView(followHead)
@@ -304,7 +304,7 @@ class HomeActivity : AppCompatActivity() {
         if (key.isEmpty()) {
             val warn = TextView(this)
             warn.text = L.s(this@HomeActivity, "Gemini API key မထည့်ရသေးပါ", "Gemini API key not set yet")
-            warn.setTextColor(Color.parseColor("#39FF14"))
+            warn.setTextColor(ThemePalette.accent(this))
             warn.textSize = 15f
             warn.setTypeface(null, Typeface.BOLD)
             statusCard.addView(warn)
@@ -329,7 +329,7 @@ class HomeActivity : AppCompatActivity() {
         } else if (provider == "custom") {
             val ok = TextView(this)
             ok.text = "CUSTOM PROVIDER ✓ သင့်နေပါပြီ"
-            ok.setTextColor(Color.parseColor("#B6FF00"))
+            ok.setTextColor(ThemePalette.highlight(this))
             ok.textSize = 15f
             ok.setTypeface(null, Typeface.BOLD)
             statusCard.addView(ok)
@@ -345,7 +345,7 @@ class HomeActivity : AppCompatActivity() {
         } else {
             val ok = TextView(this)
             ok.text = "GEMINI API ✓ သင့်နေပါပြီ"
-            ok.setTextColor(Color.parseColor("#B6FF00"))
+            ok.setTextColor(ThemePalette.highlight(this))
             ok.textSize = 15f
             ok.setTypeface(null, Typeface.BOLD)
             statusCard.addView(ok)
@@ -723,7 +723,7 @@ class HomeActivity : AppCompatActivity() {
         if (yt != null && fb != null) {
             if (m == "youtube") {
                 yt.setBackgroundResource(R.drawable.bg_mode_card_selected)
-                yt.setTextColor(Color.parseColor("#39FF14"))
+                yt.setTextColor(ThemePalette.accent(this))
                 fb.setBackgroundResource(R.drawable.bg_mode_card)
                 fb.setTextColor(Color.parseColor("#C9D2EC"))
                 linkBox.visibility = View.VISIBLE
@@ -732,7 +732,7 @@ class HomeActivity : AppCompatActivity() {
                 yt.setBackgroundResource(R.drawable.bg_mode_card)
                 yt.setTextColor(Color.parseColor("#C9D2EC"))
                 fb.setBackgroundResource(R.drawable.bg_mode_card_selected)
-                fb.setTextColor(Color.parseColor("#39FF14"))
+                fb.setTextColor(ThemePalette.accent(this))
                 linkBox.visibility = View.GONE
                 fileBox.visibility = View.VISIBLE
             }
