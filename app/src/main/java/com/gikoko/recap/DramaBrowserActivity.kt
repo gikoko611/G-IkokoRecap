@@ -209,7 +209,7 @@ class DramaBrowserActivity : AppCompatActivity() {
         """.trimIndent()
         browser.evaluateJavascript(js) { raw ->
             try {
-                val b64 = raw?.trim()?.removeSurrounding("\\"") ?: ""
+                val b64 = raw?.trim()?.removeSurrounding("\"") ?: ""
                 val decoded = String(Base64.decode(b64, Base64.DEFAULT), Charsets.UTF_8)
                 val arr = org.json.JSONArray(decoded)
                 val urls = (0 until arr.length()).map { arr.getString(it) }.distinct()
