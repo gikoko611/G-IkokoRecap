@@ -74,7 +74,6 @@ jobs:
           path: out/GIKOKO-RECAP-release.apk
 
       - name: Create or update Release
-        if: steps.signing.outputs.persistent == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -82,7 +81,7 @@ jobs:
           TAG="v0.0.5"
           gh release create "$TAG" out/GIKOKO-RECAP-release.apk \
             --title "GIKOKO RECAP $TAG" \
-            --notes "GIKOKO RECAP 0.0.5: Professional Smart Reliability Engine — persistent WorkManager jobs for video/text/queues, duplicate protection, Gemini API model discovery and failover, resumable chunk uploads, 47-hour File API checkpoints, 7-day AI plan checkpoints, TTS/frame cache, queue resume, low-RAM adaptive rendering, MP4/SRT/audio validation and completion notifications. Existing recap, drama browser, subtitles, voice and local Media3 rendering retained." \
+            --notes "GIKOKO RECAP 0.0.5: Professional Smart Reliability Engine — persistent WorkManager jobs for video/text/queues, duplicate protection, Gemini API model discovery and failover, resumable chunk uploads, 47-hour File API checkpoints, 7-day AI plan checkpoints, TTS/frame cache, queue resume, low-RAM adaptive rendering, MP4/SRT/audio validation and completion notifications. Existing recap, drama browser, subtitles, voice and local Media3 rendering retained. IMPORTANT: This build uses the current CI signing key; configure a permanent signing key before relying on in-place upgrades." \
             --target "$GITHUB_SHA" || gh release upload "$TAG" out/GIKOKO-RECAP-release.apk --clobber
 
       - name: Post build log on failure
