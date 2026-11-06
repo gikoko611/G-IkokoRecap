@@ -201,9 +201,9 @@ class DramaBrowserActivity : AppCompatActivity() {
               });
               document.querySelectorAll('a[href]').forEach(function(a) {
                 var h=a.href||'';
-                if (/\\.(mp4|m4v|webm|mov|3gp)(\\?|$)/i.test(h)) urls.push(h);
+                if (/\.(mp4|m4v|webm|mov|3gp)(\?|$)/i.test(h)) urls.push(h);
               });
-              urls = Array.from(new Set(urls)).filter(function(u) { return /^https?:\\/\\//i.test(u); });
+              urls = Array.from(new Set(urls)).filter(function(u) { return /^https?:\/\//i.test(u); });
               return btoa(unescape(encodeURIComponent(JSON.stringify(urls))));
             })();
         """.trimIndent()
@@ -240,16 +240,17 @@ class DramaBrowserActivity : AppCompatActivity() {
         }
         importButton.isEnabled = false
         status.text = "Downloading public video file..."
+        val userAgent = browser.settings.userAgentString
+        val referer = browser.url
+        val cookie = CookieManager.getInstance().getCookie(videoUrl)
         lifecycleScope.launch {
             try {
                 val file = withContext(Dispatchers.IO) {
                     val requestBuilder = Request.Builder()
                         .url(videoUrl)
-                        .header("User-Agent", browser.settings.userAgentString)
+                        .header("User-Agent", userAgent)
                         .header("Accept", "video/*,*/*;q=0.8")
-                    val referer = browser.url
                     if (!referer.isNullOrBlank()) requestBuilder.header("Referer", referer)
-                    val cookie = CookieManager.getInstance().getCookie(videoUrl)
                     if (!cookie.isNullOrBlank()) requestBuilder.header("Cookie", cookie)
                     http.newCall(requestBuilder.get().build()).execute().use { response ->
                         if (!response.isSuccessful) throw IOException("Video download HTTP " + response.code)
