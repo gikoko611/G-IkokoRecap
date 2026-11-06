@@ -27,6 +27,7 @@ jobs:
           gradle-version: '8.7'
 
       - name: Generate or restore signing keystore
+        id: signing
         shell: bash
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -34,13 +35,15 @@ jobs:
           if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
             printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > app/ci.keystore
             echo "Using persistent Android signing keystore from repository secret."
+            echo "persistent=true" >> "$GITHUB_OUTPUT"
           else
             keytool -genkeypair -v \
               -keystore app/ci.keystore \
               -storepass gikoko2026 -keypass gikoko2026 \
               -alias gikoko -keyalg RSA -keysize 2048 -validity 10000 \
               -dname "CN=GIkoko, OU=Recap, O=GIkoko, L=Yangon, C=MM"
-            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret configured. This APK uses a temporary signing key and may require uninstalling the previous app before installation."
+            echo "persistent=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret configured. This APK is temporary-signed; the Release asset will be withheld to protect future in-place updates."
           fi
 
       - name: Build release APK
@@ -71,6 +74,7 @@ jobs:
           path: out/GIKOKO-RECAP-release.apk
 
       - name: Create or update Release
+        if: steps.signing.outputs.persistent == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
