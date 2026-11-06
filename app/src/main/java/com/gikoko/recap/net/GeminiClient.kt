@@ -164,6 +164,7 @@ object GeminiClient {
                 message.contains("http 429") || message.contains("http 500") ||
                 message.contains("http 502") || message.contains("http 503") ||
                 message.contains("http 504") || message.contains("timeout") ||
+                message.contains("gemini video processing 10") ||
                 message.contains("connection reset") || message.contains("unable to resolve host")) return true
             current = current.cause
         }
