@@ -181,7 +181,7 @@ object GeminiClient {
         return null
     }
 
-    fun resolveAvailableFlashModel(apiKey: String, currentModel: String): String? {
+    fun resolveAvailableFlashModel(apiKey: String, currentModel: String, excludeCurrent: Boolean = false): String? {
         return runCatching {
             val models = get(apiKey, "/v1beta/models").optJSONArray("models") ?: JSONArray()
             val available = HashSet<String>()
@@ -197,7 +197,8 @@ object GeminiClient {
                     available.add(name)
                 }
             }
-            if (currentModel in available) return@runCatching currentModel
+            if (!excludeCurrent && currentModel in available) return@runCatching currentModel
+            val candidates = if (excludeCurrent) available.filter { it != currentModel }.toSet() else available
             val preference = listOf(
                 "gemini-3.8-flash",
                 "gemini-3.7-flash",
@@ -208,12 +209,12 @@ object GeminiClient {
                 "gemini-2.5-flash",
                 "gemini-2.5-flash-lite"
             )
-            preference.firstOrNull { it in available } ?: available.sorted().firstOrNull()
+            preference.firstOrNull { it in candidates } ?: candidates.sorted().firstOrNull()
         }.getOrNull()
     }
 
     private fun findAvailableFlashFallback(apiKey: String, currentModel: String): String? =
-        resolveAvailableFlashModel(apiKey, currentModel)?.takeIf { it != currentModel }
+        resolveAvailableFlashModel(apiKey, currentModel, excludeCurrent = true)?.takeIf { it != currentModel }
 
     private fun post(apiKey: String, path: String, body: String): JSONObject {
         val req = Request.Builder()
