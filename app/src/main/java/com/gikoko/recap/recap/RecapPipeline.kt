@@ -231,7 +231,7 @@ object RecapPipeline {
         onProgress: (Int) -> Unit
     ): RecapOutput {
         if (useFrames) return renderYouTube(context, plan, cfg, onStep, onLog, onProgress)
-        DeviceGuard.checkRender(context, onLog)
+        val lowResourceMode = DeviceGuard.checkRender(context, onLog)
         val cache = File(context.cacheDir, "recap_work")
         cache.mkdirs()
         onStep(L.s(context, "အသံထုတ်နေသည်...", "Generating voice..."))
@@ -282,9 +282,9 @@ object RecapPipeline {
             }
             if (cfg.vertical) {
                 videoEffects.add(androidx.media3.effect.Crop(cropL, cropR, cropT, cropB))
-                videoEffects.add(Presentation.createForWidthAndHeight(1080, 1920, Presentation.LAYOUT_SCALE_TO_FIT))
+                videoEffects.add(Presentation.createForWidthAndHeight(if (lowResourceMode) 720 else 1080, if (lowResourceMode) 1280 else 1920, Presentation.LAYOUT_SCALE_TO_FIT))
             } else {
-                videoEffects.add(Presentation.createForHeight(if (cfg.quality == 0) 720 else 1080))
+                videoEffects.add(Presentation.createForHeight(if (cfg.quality == 0 || lowResourceMode) 720 else 1080))
             }
             val effectList: List<Effect> = ImmutableList.copyOf(videoEffects)
             b.setEffects(Effects(ImmutableList.of(), effectList))
@@ -315,6 +315,8 @@ object RecapPipeline {
         withContext(Dispatchers.IO) {
             srt.writeText(buildSrt(plan.segments, wavs, 0))
         }
+        OutputValidator.validateSrt(srt, plan.segments.size)
+        onLog("SRT CHECK: " + plan.segments.size + " subtitle cues verified ✓")
         var summary = plan.segments.joinToString(" ") { s -> s.text }
         if (plan.chapters.isNotEmpty()) summary += "\n\nCHAPTERS\n" + plan.chapters.joinToString("\n")
         if (plan.quiz.isNotEmpty()) summary += "\n\nQUIZ\n" + plan.quiz.joinToString("\n")
@@ -406,6 +408,8 @@ object RecapPipeline {
         withContext(Dispatchers.IO) {
             srt.writeText(buildSrt(plan.segments, wavs, if (cfg.introOutro) 2500 else 0))
         }
+        OutputValidator.validateSrt(srt, plan.segments.size)
+        onLog("SRT CHECK: " + plan.segments.size + " subtitle cues verified ✓")
         var summary = plan.segments.joinToString(" ") { s -> s.text }
         if (plan.chapters.isNotEmpty()) summary += "\n\nCHAPTERS\n" + plan.chapters.joinToString("\n")
         if (plan.quiz.isNotEmpty()) summary += "\n\nQUIZ\n" + plan.quiz.joinToString("\n")
@@ -657,6 +661,7 @@ object RecapPipeline {
         onProgress: (Int) -> Unit
     ): File? {
         if (plan.segments.isEmpty() || wavs.isEmpty()) return null
+        val lowResourceMode = DeviceGuard.checkRender(context, onLog)
         val cache = File(context.cacheDir, "recap_work")
         cache.mkdirs()
         val idx = plan.segments.indices.sortedByDescending { i -> WavUtil.wavDurationMs(wavs[i].readBytes()) }.take(3).sorted()
@@ -703,7 +708,7 @@ object RecapPipeline {
                     fx.add(OverlayEffect(texList))
                 }
                 fx.add(androidx.media3.effect.Crop(cropL, cropR, cropT, cropB))
-                fx.add(Presentation.createForWidthAndHeight(1080, 1920, Presentation.LAYOUT_SCALE_TO_FIT))
+                fx.add(Presentation.createForWidthAndHeight(if (lowResourceMode) 720 else 1080, if (lowResourceMode) 1280 else 1920, Presentation.LAYOUT_SCALE_TO_FIT))
                 val effectList: List<Effect> = ImmutableList.copyOf(fx)
                 b.setEffects(Effects(ImmutableList.of(), effectList))
                 videoItems.add(b.build())
