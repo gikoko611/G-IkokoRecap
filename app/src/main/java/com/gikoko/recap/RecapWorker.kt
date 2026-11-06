@@ -322,17 +322,35 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 failed++
                 lastFailure = e
                 appendLog("QUEUE ITEM FAILED: " + file.name + " — " + (e.message ?: e.javaClass.simpleName))
+                if (series) {
+                    appendLog("QUEUE SERIES: pausing after failed chapter so later chapters can resume with correct context")
+                    break
+                }
             }
         }
         if (completed == 0) throw lastFailure ?: IOException("Queue ထဲက Video တစ်ခုမှ မအောင်မြင်ပါ။")
-        queueFile.delete()
-        stateFile.delete()
+        val pending = (paths.length() - completed - failed).coerceAtLeast(0)
+        if (failed == 0 && pending == 0) {
+            queueFile.delete()
+            stateFile.delete()
+        } else {
+            appendLog("QUEUE CHECKPOINT: retained successful item states; retry will skip completed videos")
+        }
         val final = lastArchived!!.copy(
-            summary = lastArchived!!.summary + "\n\nQUEUE REPORT\nCompleted: " + completed + "/" + paths.length() + "\nFailed: " + failed
+            summary = lastArchived!!.summary + "\n\nQUEUE REPORT\nCompleted: " + completed + "/" + paths.length() +
+                "\nFailed: " + failed + "\nPending: " + pending
         )
-        progressValue = 100
-        publish("Queue completed", "Completed " + completed + "; failed " + failed)
-        postCompletionNotification("Queue completed", "Completed " + completed + " / " + paths.length())
+        progressValue = if (pending == 0 && failed == 0) 100 else progressValue
+        publish(if (failed == 0 && pending == 0) "Queue completed" else "Queue partially completed",
+            "Completed " + completed + "; failed " + failed + "; pending " + pending)
+        if (failed > 0 && lastFailure != null && GeminiClient.isTransientFailure(lastFailure!!) && runAttemptCount < MAX_RETRIES) {
+            publish("Temporary queue item failure — retry scheduled", lastFailure!!.message)
+            return Result.retry()
+        }
+        postCompletionNotification(
+            if (failed == 0 && pending == 0) "Queue completed" else "Queue needs attention",
+            "Completed " + completed + " / " + paths.length() + "; failed " + failed + "; pending " + pending
+        )
         return successData(final, "")
     }
 
