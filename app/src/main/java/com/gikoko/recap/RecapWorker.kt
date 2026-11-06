@@ -417,7 +417,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.stat_sys_upload_done)
+                .setSmallIcon(android.R.drawable.stat_sys_upload)
                 .setContentTitle(title)
                 .setContentText(message.take(120))
                 .setContentIntent(pending)
