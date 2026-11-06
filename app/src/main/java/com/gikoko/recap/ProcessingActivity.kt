@@ -459,6 +459,8 @@ class ProcessingActivity : AppCompatActivity() {
                 WorkInfo.State.SUCCEEDED -> {
                     if (workerResultHandled) return@observe
                     workerResultHandled = true
+                    (getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager)
+                        .cancel(RecapWorker.COMPLETION_NOTIFICATION_ID)
                     busy = false
                     val data = info.outputData
                     if (data.getBoolean(RecapWorker.KEY_NEEDS_CONFIRM, false)) {
@@ -493,12 +495,16 @@ class ProcessingActivity : AppCompatActivity() {
                 WorkInfo.State.FAILED -> {
                     if (workerResultHandled) return@observe
                     workerResultHandled = true
+                    (getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager)
+                        .cancel(RecapWorker.COMPLETION_NOTIFICATION_ID)
                     busy = false
                     showWorkerFailure(info.outputData.getString(RecapWorker.KEY_ERROR) ?: "Unknown background processing error")
                 }
                 WorkInfo.State.CANCELLED -> {
                     if (workerResultHandled) return@observe
                     workerResultHandled = true
+                    (getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager)
+                        .cancel(RecapWorker.COMPLETION_NOTIFICATION_ID)
                     busy = false
                     showWorkerFailure("Background job was cancelled.")
                 }
