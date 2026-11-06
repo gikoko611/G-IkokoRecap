@@ -84,6 +84,7 @@ object RecapPipeline {
         onLog: (String) -> Unit,
         onProgress: (Int) -> Unit
     ): RecapOutput {
+        DeviceGuard.checkInput(context, srcFile, onLog)
         val checkpointKey = PlanCheckpoint.keyForFile(srcFile, cfg)
         val cachedPlan = PlanCheckpoint.load(context, checkpointKey)
         val (plan, useFrames) = if (cachedPlan != null) {
