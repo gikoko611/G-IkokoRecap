@@ -80,6 +80,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 val pending = File(applicationContext.filesDir, "pending_plan_" + id + ".json")
                 pending.writeText(GeminiClient.planToJson(generated.first, generated.second))
                 publish("Plan ready — waiting for your confirmation", "AI plan saved locally; opening Plan Editor")
+                postCompletionNotification("Recap plan ready", "Tap to review and confirm your plan")
                 return Result.success(
                     workDataOf(
                         KEY_NEEDS_CONFIRM to true,
@@ -133,6 +134,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
             if (planPath.isNotEmpty()) runCatching { File(planPath).delete() }
             progressValue = 100
             publish("Completed", "Output validation and archive completed")
+            postCompletionNotification("Recap ready", archived.title)
             successData(archived, if (source == "youtube") url else "")
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -143,6 +145,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 publish("Temporary service/network error — retry scheduled", message)
                 Result.retry()
             } else {
+                postCompletionNotification("Recap needs attention", message)
                 Result.failure(errorData(message))
             }
         }
@@ -398,6 +401,29 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
 
     private fun errorData(message: String): Data = workDataOf(KEY_ERROR to message.take(1800))
 
+    private fun postCompletionNotification(title: String, message: String) {
+        runCatching {
+            val open = Intent(applicationContext, ProcessingActivity::class.java)
+                .putExtra(KEY_WORK_NAME, WORK_NAME)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            val pending = PendingIntent.getActivity(
+                applicationContext, 702, open,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.stat_sys_upload_done)
+                .setContentTitle(title)
+                .setContentText(message.take(120))
+                .setContentIntent(pending)
+                .setAutoCancel(true)
+                .setOngoing(false)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .build()
+            val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.notify(COMPLETION_NOTIFICATION_ID, notification)
+        }
+    }
+
     private fun createForegroundInfo(): ForegroundInfo {
         val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= 26) {
@@ -462,6 +488,7 @@ class RecapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         const val KEY_SOURCE_URL = "source_url"
         private const val CHANNEL_ID = "gikoko_recap_worker"
         private const val NOTIFICATION_ID = 7206
+        const val COMPLETION_NOTIFICATION_ID = 7207
         private const val MAX_RETRIES = 2
 
         fun enqueue(context: Context, source: String, pathOrUrl: String, planPath: String = ""): String {
