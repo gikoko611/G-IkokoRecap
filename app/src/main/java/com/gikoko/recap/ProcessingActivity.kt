@@ -144,18 +144,31 @@ class ProcessingActivity : AppCompatActivity() {
         val url = intent.getStringExtra("url") ?: ""
         val path = intent.getStringExtra("path") ?: ""
         val planPath = intent.getStringExtra("plan_path") ?: ""
+        val textPath = intent.getStringExtra("text_path") ?: ""
+        val intentApiKey = intent.getStringExtra("api_key").orEmpty()
 
         if (intent.hasExtra(RecapWorker.KEY_WORK_NAME)) {
             observePersistentWork(intent.getStringExtra(RecapWorker.KEY_WORK_NAME) ?: RecapWorker.WORK_NAME)
             return
         }
-        if (!queueMode && source in setOf("file", "youtube")) {
-            val workName = RecapWorker.enqueue(
+        if (intentApiKey.isBlank() && queueMode) {
+            val workName = RecapWorker.enqueueQueue(
                 this,
-                source,
-                if (source == "file") path else url,
-                planPath
+                intent.getStringExtra("queue") ?: "[]",
+                queueSeries
             )
+            intent.putExtra(RecapWorker.KEY_WORK_NAME, workName)
+            addLog("PERSISTENT QUEUE: WorkManager ဖြင့် queue background processing စတင်သည်")
+            observePersistentWork(workName)
+            return
+        }
+        if (intentApiKey.isBlank() && source in setOf("file", "youtube", "text")) {
+            val sourceRef = when (source) {
+                "file" -> path
+                "text" -> textPath
+                else -> url
+            }
+            val workName = RecapWorker.enqueue(this, source, sourceRef, planPath)
             intent.putExtra(RecapWorker.KEY_WORK_NAME, workName)
             addLog("PERSISTENT JOB: WorkManager ဖြင့် background processing စတင်သည်")
             observePersistentWork(workName)
@@ -202,7 +215,6 @@ class ProcessingActivity : AppCompatActivity() {
             Prefs.bgmVol(this).toDouble(),
             if (queueMode && queueSeries) prevSummary else ""
         )
-        val textPath = intent.getStringExtra("text_path") ?: ""
         lifecycleScope.launch {
             try {
                 addLog("Engine start - provider: " + cfg.provider + ", model: " + if (cfg.provider == "custom") cfg.customModel else cfg.model)
