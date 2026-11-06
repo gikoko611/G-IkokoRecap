@@ -435,8 +435,8 @@ class ProcessingActivity : AppCompatActivity() {
             }
             checked = true
             if (active != null) {
-                val existingFingerprint = active.inputData.getString(RecapWorker.KEY_JOB_FINGERPRINT)
-                if (existingFingerprint == fingerprint) {
+                val sameJob = active.tags.contains("job_" + fingerprint)
+                if (sameJob) {
                     addLog("DUPLICATE GUARD: matching active job found; attaching to existing work")
                     intent.putExtra(RecapWorker.KEY_WORK_NAME, RecapWorker.WORK_NAME)
                     observePersistentWork(RecapWorker.WORK_NAME)
