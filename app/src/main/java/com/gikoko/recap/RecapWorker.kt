@@ -24,6 +24,7 @@ import com.gikoko.recap.net.GeminiClient
 import com.gikoko.recap.recap.DownloadsUtil
 import com.gikoko.recap.recap.RecapOutput
 import com.gikoko.recap.recap.RecapPipeline
+import com.gikoko.recap.recap.PlanCheckpoint
 import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
