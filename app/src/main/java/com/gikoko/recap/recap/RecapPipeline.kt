@@ -166,10 +166,25 @@ object RecapPipeline {
                 onStep(L.s(context, "Video ကို Gemini ဆီ တင်နေသည်...", "Uploading video to Gemini..."))
                 onProgress(3)
                 val mime = GeminiClient.guessMime(srcFile.name)
-                val fileName = GeminiClient.uploadVideo(cfg.apiKey, srcFile, mime, srcFile.name, onLog, context)
-                onLog("Upload: " + fileName)
-                onProgress(8)
-                val ready = GeminiClient.waitForFileReady(cfg.apiKey, fileName, onLog)
+                var ready: String? = null
+                val savedFileName = GeminiFileCheckpoint.load(context, srcFile)
+                if (savedFileName != null) {
+                    try {
+                        onLog("UPLOAD CHECKPOINT: reusing previously uploaded Gemini file " + savedFileName)
+                        ready = GeminiClient.waitForFileReady(cfg.apiKey, savedFileName, onLog)
+                    } catch (e: Exception) {
+                        if (GeminiClient.isTransientFailure(e)) throw e
+                        GeminiFileCheckpoint.clear(context, srcFile)
+                        onLog("UPLOAD CHECKPOINT: saved Gemini file is no longer available; uploading again")
+                    }
+                }
+                if (ready == null) {
+                    val fileName = GeminiClient.uploadVideo(cfg.apiKey, srcFile, mime, srcFile.name, onLog, context)
+                    GeminiFileCheckpoint.save(context, srcFile, fileName)
+                    onLog("Upload: " + fileName)
+                    onProgress(8)
+                    ready = GeminiClient.waitForFileReady(cfg.apiKey, fileName, onLog)
+                }
                 onProgress(12)
                 onStep(L.s(context, "AI နဲ့ ခြုံငုံသုံးသပ်နေသည်...", "Analyzing with AI..."))
                 onProgress(18)
