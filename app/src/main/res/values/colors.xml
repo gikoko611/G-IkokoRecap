@@ -1,10 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg">#05070E</color>
-    <color name="bg_card">#0D1220</color>
-    <color name="gold">#FFC940</color>
-    <color name="gold_dark">#8A5A00</color>
-    <color name="cyan">#3DE8F8</color>
-    <color name="text_main">#F2F5FF</color>
-    <color name="text_dim">#8A93B2</color>
-    <color name="danger">#FF4D6D</color>
+    <color name="neon_green">#00FF9C</color>
+    <color name="neon_dim">#0A3D2A</color>
+    <color name="bg_dark">#03140C</color>
+    <color name="bg_surface">#062015</color>
+    <color name="bg_card">#0A2B1D</color>
+    <color name="text_main">#D8FFE9</color>
+    <color name="text_dim">#5FA986</color>
+    <color name="ic_launcher_background">#03140C</color>
 </resources>
