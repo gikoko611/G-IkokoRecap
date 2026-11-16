@@ -26,17 +26,30 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Generate signing keystore
+      - name: Generate or restore signing keystore
+        id: signing
         shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
-          keytool -genkeypair -v \
-            -keystore app/ci.keystore \
-            -storepass gikoko2026 -keypass gikoko2026 \
-            -alias gikoko -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=GIkoko, OU=Recap, O=GIkoko, L=Yangon, C=MM"
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > app/ci.keystore
+            echo "Using persistent Android signing keystore from repository secret."
+          else
+            keytool -genkeypair -v \
+              -keystore app/ci.keystore \
+              -storepass gikoko2026 -keypass gikoko2026 \
+              -alias gikoko -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=GI AI, OU=AI, O=GIkoko, L=Yangon, C=MM"
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret configured. Temporary signing key."
+          fi
 
       - name: Build release APK
         shell: bash
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -o pipefail
           gradle assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
@@ -45,29 +58,24 @@ jobs:
         shell: bash
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/release/*.apk out/GIKOKO-RECAP-release.apk
-
-      - name: Verify signature
-        shell: bash
-        run: |
-          ${ANDROID_HOME}/build-tools/34.0.0/apksigner verify --print-certs out/GIKOKO-RECAP-release.apk | head -n 5 || true
+          cp app/build/outputs/apk/release/*.apk out/G-I-AI-release.apk
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GIKOKO-RECAP-release
-          path: out/GIKOKO-RECAP-release.apk
+          name: G-I-AI-release
+          path: out/G-I-AI-release.apk
 
       - name: Create or update Release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v0.0.1"
-          gh release create "$TAG" out/GIKOKO-RECAP-release.apk \
-            --title "GIKOKO RECAP $TAG" \
-            --notes "GIKOKO RECAP 0.0.1: Edge TTS, Tools page, watermark remover, usage tracker, SRT export, thumbnail maker. Myanmar AI voice + captions video recap." \
-            --target "$GITHUB_SHA" || gh release upload "$TAG" out/GIKOKO-RECAP-release.apk --clobber
+          TAG="v1.0.0"
+          gh release create "$TAG" out/G-I-AI-release.apk \
+            --title "G.I AI $TAG" \
+            --notes "G.I AI 1.0.0 - ChatGPT-style chat UI (neon cyber dark green), custom AI provider API key + free model filter, image/video/file upload via + button, background 3D animation video engine (AI writes Three.js -> frame render -> H.264 mp4 -> Downloads), Termux bridge (AI runs termux scripts), GitHub token access (read/write/create/delete + Actions dispatch), phone access permissions, 3D animated splash with Powered by I KO KO." \
+            --target "$GITHUB_SHA" || gh release upload "$TAG" out/G-I-AI-release.apk --clobber
 
       - name: Post build log on failure
         if: failure()
@@ -75,11 +83,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          {
-            echo "# CI build failed - debug log"
-            echo
-            tail -n 400 build.log || true
-            echo
-            grep -n -i "error\|FAILED" build.log | tail -n 40 || true
-          } > /tmp/body.md
-          gh issue create --title "CI build failed - debug log" --body-file /tmp/body.md || true
+          gh issue create --title "G.I AI build failed - debug log" --body-file build.log || true

@@ -1,63 +1,33 @@
-# GIkoko One Recap (Pro v2.0)
+# G.I AI
 
-AI video recap app - YouTube link ဒါမှမဟုတ် ဖုန်းထဲက video file ကနေ **အရေးကြီးတဲ့ အပိုင်းတွေချုံ**၊ မြန်မာ AI အသံ + မြန်မာစာတန်းထိုးနဲ့ တစ်ပွင့်တည်း recap video လုပ်ပေးတဲ့ Android app။
+**G.I AI** - on-device AI chat app by **I KO KO**. ChatGPT-style UI with a **neon cyber dark green** theme.
 
-## Features (Pro v2.0)
+## Features
+- 💬 Chat with any **custom AI provider** (OpenAI-compatible base URL + API key; OpenRouter recommended)
+- 🆓 **FREE MODELS ONLY** filter (fetch + pick `:free` models)
+- ➕ **+ button** next to the input: upload images (vision), videos, files
+- 🎬 **3D ANIMATION VIDEO ENGINE**: AI writes a Three.js scene, the app renders frames and encodes on-device H.264, then saves **mp4 + frames ZIP + scene HTML** to Downloads/GIAI (runs in background, only a small status chip on the chat page)
+- 🖥 **Termux bridge**: AI replies with a ```termux code block, the app executes it inside Termux (use any Termux tool: ffmpeg, python, node...)
+- 🐙 **GitHub access**: token in Settings, read / write / create / delete files, list repos, dispatch + read GitHub Actions
+- 📱 Phone access permissions + network access from Settings
+- ⬇ Auto-download of every generated output (mp4, zip, images, code files)
+- 🌟 3D animated splash: **G.I** logo + AI rings, **Powered by I KO KO**
 
-- YouTube link နဲ့ recap (Gemini က video ကိုတိုက်ရိုက်လုပ်ဆောင်)
-- ဖုန်းထဲက video file upload (MP4/MOV/MKV/WebM/AVI/3GP) - Facebook/TikTok video တွေအတွက်
-- Myanmar AI voice မျိုးစုံ (Puck, Charon, Fenrir, Kore ... 12 မျိုး)
-- အသံ PREVIEW - မရွေးခင် စမ်းနားထောင်နိုင်
-- မြန်မာစာတန်းထိုး (SRT) အလိုအလျောက်ထွက်
-- Recap အချိန် ရွေးနိုင် - Auto / 1 / 3 / 5 မိနစ်
-- Segments mode - Compact (4-6) သို့ Full (6-12)
-- Narration ဘာသာ - မြန်မာ / English
-- Video quality - 720p / 1080p
-- Watermark ထည့်/ပယ်ဖျက်နိုင်
-- Intro / Outro branded card များ
-- Auto-save to Downloads (သော့ဖွင့်နိုင်)
-- History - လုပ်ခဲ့တဲ့ recap အားလုံး ပြန်ကြည့် / ပြန်ဖွင့် / မျှဝေ / ဖျက်
-- Settings page - API key ထည့်/စစ်ဆေး၊ model ရွေး (gemini-2.5-flash / gemini-2.0-flash)
-- Left drawer menu (ဘယ်ဘက်နှိပ် ဆွဲ)
-- Haptic feedback
-- Cache ရှင်းလင်းမှု
-- Share - Video / SRT / Text summary
-- Retry on error
-- Signed release APK (install မလုပ်နိုင်တာ ပြေလည်)
+## Setup
+1. Settings, **AI PROVIDER**: base URL + API key (e.g. `https://openrouter.ai/api/v1`), tap FETCH MODELS, pick a model (FREE ONLY switch available), TEST.
+2. Settings, **GITHUB**: paste a Personal Access Token (repo scope), set default repo, test READ/WRITE/DELETE/RUN WORKFLOW.
+3. Settings, **TERMUX**: install Termux, run `pkg install termux-api ffmpeg python nodejs`, set `allow-external-apps=true` in `~/.termux/termux.properties`, then TEST COMMAND.
+4. Settings, **PHONE ACCESS**: GRANT permissions.
 
-## Gemini API Key
+## 3D contract for AI scenes
+```html
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script>
+  window.giTotal = 90;              // total frames
+  window.giFrame = function (t) {   // t = 0..1, deterministic
+    // update your Three.js scene for time t
+  };
+</script>
+```
 
-1. https://aistudio.google.com/apikey မှာ အကောင့်ဝင်ပြီး API key တစ်ခု ဖန်တီးပါ
-2. App ထဲမှာ ဘယ်ဘက် ≡ ကိုနှိပ် → Settings → API key ထည့် → SAVE → TEST KEY
-3. 403 error ပေါ်ရင် - key မှားနေတာ ဒါမှမဟုတ် region block ဖြစ်နေတာပါ (VPN သုံးပြီး စမ်းကြည့်ပါ)
-
-## Download APK
-
-CI အလိုအလျောက် build လုပ်ပြီး signed APK release တင်ပေးမယ် -
-https://github.com/gikoko611/G-IkokoRecap/releases
-
-GIkokoOneRecap-release.apk ကို ရွေးချယ်ပါ။
-
-## Icon / Logo အစားထိုးခြင်း (စိတကြိုက်ပုံနဲ့)
-
-App icon နဲ့ logo ဟာ vector placeholder တွေပါ။ ကိုယ်ပိုင် JPEG ပုံတွေနဲ့ အစားထိုးချင်ရင် -
-
-1. GitHub web မှာ ဒီ repo ကိုဖွင့်ပါ
-2. app/src/main/res/drawable-nodpi/ folder အသစ်တည်ဆောက်ပါ (Add file → Create new file မှာ path ရိုက်)
-3. ပုံဖိုင်တွေကို upload ပြီး နာမည်တွေကို ဒီအတိုင်းပေးပါ -
-   - app_icon.jpg (512x512, square)
-   - app_logo.jpg (1280x720, 16:9)
-4. ပုံတွေကို အသုံးချချင်ရင် layout တွေထဲမှာ ImageView src အနေနဲ့ ညွှန်းပါ
-
-Vector drawables (ic_monogram.xml, img_splash_logo.xml) က gold/black cyber style နဲ့ ကိုယ်တိုင်ဆွဲထားတာပါ။
-
-## Tech
-
-- Kotlin, AndroidX, Material Components
-- Google Gemini API (generateContent + TTS)
-- Media3 Transformer (video composition + overlays)
-- GitHub Actions CI (signed APK auto-release)
-
-## Developer
-
-I Ko Ko - GIkoko One Recap
+Powered by **I KO KO** 🟢
