@@ -7,7 +7,9 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
+import android.widget.EditText
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 
 object Neon {
     val GREEN = Color.parseColor("#00FF9C")
@@ -36,7 +38,7 @@ object Neon {
         b.allCaps = false
         b.textSize = 13f
         b.setTextColor(GREEN)
-        b.background = android.support.v4.content.ContextCompat.getDrawable(c, R.drawable.bg_card)
+        b.background = ContextCompat.getDrawable(c, R.drawable.bg_card)
         b.setOnClickListener(onClick)
         b.setPadding(dp(c, 12), dp(c, 4), dp(c, 12), dp(c, 4))
         return b
@@ -48,14 +50,14 @@ object Neon {
         return t
     }
 
-    fun input(c: Context, hint: String, value: String = "", password: Boolean = false): android.widget.EditText {
-        val e = android.widget.EditText(c)
+    fun input(c: Context, hint: String, value: String = "", password: Boolean = false): EditText {
+        val e = EditText(c)
         e.hint = hint
         e.setText(value)
         e.setTextColor(TEXT)
         e.setHintTextColor(DIM)
         e.textSize = 13f
-        e.background = android.support.v4.content.ContextCompat.getDrawable(c, R.drawable.bg_input)
+        e.background = ContextCompat.getDrawable(c, R.drawable.bg_input)
         e.setPadding(dp(c, 12), dp(c, 10), dp(c, 12), dp(c, 10))
         if (password) e.transformationMethod = android.text.method.PasswordTransformationMethod.getInstance()
         return e
@@ -65,11 +67,5 @@ object Neon {
         val t = label(c, text, 12f, DIM)
         t.setPadding(dp(c, 16), dp(c, 4), dp(c, 16), dp(c, 4))
         return t
-    }
-
-    fun center(v: View): View {
-        (v.layoutParams as? android.widget.LinearLayout.LayoutParams)
-            ?.gravity = Gravity.CENTER_HORIZONTAL
-        return v
     }
 }

@@ -35,6 +35,7 @@ object FrameEncoder {
         var muxStarted = false
         val info = MediaCodec.BufferInfo()
         val frameUs = 1_000_000L / fps.coerceAtLeast(1)
+        var lastPts = 0L
 
         fun drain(end: Boolean) {
             while (true) {
@@ -46,16 +47,12 @@ object FrameEncoder {
                 }
                 if (idx < 0) continue
                 val buf = codec.getOutputBuffer(idx) ?: continue
-                if (info.size > 0 && muxStarted) {
-                    info.presentationTimeUs = lastPts
-                    muxer.writeSampleData(track, buf, info)
-                }
+                if (info.size > 0 && muxStarted) muxer.writeSampleData(track, buf, info)
                 codec.releaseOutputBuffer(idx, false)
                 if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) return
             }
         }
 
-        var lastPts = 0L
         try {
             for ((i, f) in pngs.withIndex()) {
                 var inIdx = -1
@@ -85,7 +82,9 @@ object FrameEncoder {
         return out.length() > 0
     }
 
-    private fun clamp(v: Int) = v.coerceIn(0, 255)
+    private fun yOf(R: Int, G: Int, B: Int): Int = (77 * R + 150 * G + 29 * B) shr 8
+
+    private fun clamp(v: Int): Int = v.coerceIn(0, 255)
 
     private fun fillYuv(img: android.media.Image, bmp: Bitmap, w: Int, h: Int) {
         val px = IntArray(w * h)
@@ -94,7 +93,7 @@ object FrameEncoder {
         val uP = img.planes[1]
         val vP = img.planes[2]
         val yBuf: ByteBuffer = yP.buffer
-        val uvBuf: ByteBuffer = uP.buffer
+        val uBuf: ByteBuffer = uP.buffer
         val vBuf: ByteBuffer = vP.buffer
         val yRow = ByteArray(w)
         for (r in 0 until h) {
@@ -104,7 +103,7 @@ object FrameEncoder {
                 val R = (p shr 16) and 0xFF
                 val G = (p shr 8) and 0xFF
                 val B = p and 0xFF
-                yRow[k++] = clamp((77 * R + 150 * G + 29 * B) shr 8).toByte()
+                yRow[k++] = clamp(yOf(R, G, B)).toByte()
             }
             val off = r * yP.rowStride
             for (c in 0 until w) yBuf.put(off + c, yRow[c])
@@ -116,19 +115,18 @@ object FrameEncoder {
                 val R = (p shr 16) and 0xFF
                 val G = (p shr 8) and 0xFF
                 val B = p and 0xFF
-                val u = clamp(((B - Y(R, G, B)) * 564 shr 10) + 128)
-                val v = clamp(((R - Y(R, G, B)) * 713 shr 10) + 128)
+                val y = yOf(R, G, B)
+                val u = clamp(((B - y) * 564 shr 10) + 128)
+                val v = clamp(((R - y) * 713 shr 10) + 128)
                 if (semi) {
                     val off = r * uP.rowStride + c * 2
-                    uvBuf.put(off, u.toByte())
-                    uvBuf.put(off + 1, v.toByte())
+                    uBuf.put(off, u.toByte())
+                    uBuf.put(off + 1, v.toByte())
                 } else {
+                    uBuf.put(r * uP.rowStride + c * uP.pixelStride, u.toByte())
                     vBuf.put(r * vP.rowStride + c * vP.pixelStride, v.toByte())
-                    uvBuf.put(r * uP.rowStride + c * uP.pixelStride, u.toByte())
                 }
             }
         }
     }
-
-    private fun Y(R: Int, G: Int, B: Int) = (77 * R + 150 * G + 29 * B) shr 8
 }
