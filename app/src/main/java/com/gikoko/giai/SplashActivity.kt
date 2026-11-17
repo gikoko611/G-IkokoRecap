@@ -40,7 +40,7 @@ class SplashActivity : Activity() {
                 val w = width.toFloat(); val h = height.toFloat()
                 c.drawColor(Neon.BG)
                 glow.shader = RadialGradient(w / 2, h * 0.38f, w * 0.5f,
-                    intArrayOf(Color.parseColor("#0D5C3A"), Neon.BG), Shader.TileMode.CLAMP)
+                    intArrayOf(Color.parseColor("#0D5C3A"), Neon.BG), null, Shader.TileMode.CLAMP)
                 c.drawRect(0f, 0f, w, h, glow)
                 val cx = w / 2; val cy = h * 0.38f; val base = w * 0.28f
                 for (i in 0 until 3) {
@@ -58,7 +58,7 @@ class SplashActivity : Activity() {
                     c.restore()
                 }
                 text.textSize = Neon.dp(context, 52).toFloat()
-                text.alpha = (0.5f + 0.5f * t).coerceAtMost(1f)
+                text.alpha = ((0.5f + 0.5f * t) * 255f).toInt().coerceIn(0, 255)
                 c.drawText("G.I", cx, cy + Neon.dp(context, 14).toFloat(), text)
                 sub.textSize = Neon.dp(context, 16).toFloat()
                 sub.color = Neon.GREEN
