@@ -24,29 +24,52 @@ Daemon will be stopped at the end of the build
 > Task :app:extractReleaseNativeSymbolTables NO-SOURCE
 > Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
 > Task :app:desugarReleaseFileDependencies
-> Task :app:checkReleaseDuplicateClasses
 > Task :app:mergeReleaseStartupProfile
-> Task :app:mergeReleaseShaders
+> Task :app:checkReleaseDuplicateClasses
 > Task :app:mergeReleaseArtProfile
+> Task :app:mergeReleaseShaders
 > Task :app:compileReleaseShaders NO-SOURCE
 > Task :app:generateReleaseAssets UP-TO-DATE
 > Task :app:mergeReleaseAssets
 > Task :app:compressReleaseAssets
-> Task :app:processReleaseResources FAILED
 > Task :app:extractReleaseVersionControlInfo
+> Task :app:processReleaseResources
+> Task :app:collectReleaseDependencies
 > Task :app:mergeExtDexRelease
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1794881423461.json
+> Task :app:sdkReleaseDependencyData
+> Task :app:validateSigningRelease
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+> Task :app:optimizeReleaseResources
+
+> Task :app:compileReleaseKotlin FAILED
+e: file:///home/runner/work/G-IkokoRecap/G-IkokoRecap/app/src/main/java/com/gikoko/giai/MainActivity.kt:122:96 Type mismatch: inferred type is LinearLayout.LayoutParams but Context was expected
+e: file:///home/runner/work/G-IkokoRecap/G-IkokoRecap/app/src/main/java/com/gikoko/giai/MainActivity.kt:122:114 Type mismatch: inferred type is LinearLayout.LayoutParams but Context was expected
+e: file:///home/runner/work/G-IkokoRecap/G-IkokoRecap/app/src/main/java/com/gikoko/giai/MainActivity.kt:144:90 Type mismatch: inferred type is LinearLayout.LayoutParams but Context was expected
+e: file:///home/runner/work/G-IkokoRecap/G-IkokoRecap/app/src/main/java/com/gikoko/giai/MainActivity.kt:144:114 Type mismatch: inferred type is LinearLayout.LayoutParams but Context was expected
+e: file:///home/runner/work/G-IkokoRecap/G-IkokoRecap/app/src/main/java/com/gikoko/giai/MainActivity.kt:182:31 None of the following functions can be called with the arguments supplied: 
+public final fun openAssetFileDescriptor(p0: Uri, p1: String): AssetFileDescriptor? defined in android.content.ContentResolver
+public final fun openAssetFileDescriptor(p0: Uri, p1: String, p2: CancellationSignal?): AssetFileDescriptor? defined in android.content.ContentResolver
+e: file:///home/runner/work/G-IkokoRecap/G-IkokoRecap/app/src/main/java/com/gikoko/giai/MainActivity.kt:182:67 Unresolved reference: it
+e: file:///home/runner/work/G-IkokoRecap/G-IkokoRecap/app/src/main/java/com/gikoko/giai/MainActivity.kt:245:26 'if' must have both main and 'else' branches if used as an expression
+e: file:///home/runner/work/G-IkokoRecap/G-IkokoRecap/app/src/main/java/com/gikoko/giai/MainActivity.kt:358:154 Type mismatch: inferred type is LinearLayout.LayoutParams but Context was expected
+e: file:///home/runner/work/G-IkokoRecap/G-IkokoRecap/app/src/main/java/com/gikoko/giai/MainActivity.kt:358:176 Type mismatch: inferred type is LinearLayout.LayoutParams but Context was expected
+e: file:///home/runner/work/G-IkokoRecap/G-IkokoRecap/app/src/main/java/com/gikoko/giai/SplashActivity.kt:42:31 None of the following functions can be called with the arguments supplied: 
+public constructor RadialGradient(p0: Float, p1: Float, p2: Float, p3: Float, p4: Float, p5: Float, p6: LongArray, p7: FloatArray?, p8: Shader.TileMode) defined in android.graphics.RadialGradient
+public constructor RadialGradient(p0: Float, p1: Float, p2: Float, p3: Int, p4: Int, p5: Shader.TileMode) defined in android.graphics.RadialGradient
+public constructor RadialGradient(p0: Float, p1: Float, p2: Float, p3: IntArray, p4: FloatArray?, p5: Shader.TileMode) defined in android.graphics.RadialGradient
+public constructor RadialGradient(p0: Float, p1: Float, p2: Float, p3: Long, p4: Long, p5: Shader.TileMode) defined in android.graphics.RadialGradient
+public constructor RadialGradient(p0: Float, p1: Float, p2: Float, p3: LongArray, p4: FloatArray?, p5: Shader.TileMode) defined in android.graphics.RadialGradient
+e: file:///home/runner/work/G-IkokoRecap/G-IkokoRecap/app/src/main/java/com/gikoko/giai/SplashActivity.kt:61:30 Type mismatch: inferred type is Float but Int was expected
+e: file:///home/runner/work/G-IkokoRecap/G-IkokoRecap/app/src/main/java/com/gikoko/giai/Ui.kt:38:11 Unresolved reference: allCaps
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1794881506195.json
 
 FAILURE: Build failed with an exception.
 
 * What went wrong:
-Execution failed for task ':app:processReleaseResources'.
-> A failure occurred while executing com.android.build.gradle.internal.res.LinkApplicationAndroidResourcesTask$TaskAction
-   > Android resource linking failed
-     ERROR: /home/runner/work/G-IkokoRecap/G-IkokoRecap/app/src/main/res/mipmap-anydpi/ic_launcher.xml: AAPT: error: <adaptive-icon> elements require a sdk version of at least 26.
-         
-     ERROR: /home/runner/work/G-IkokoRecap/G-IkokoRecap/app/src/main/res/mipmap-anydpi/ic_launcher_round.xml: AAPT: error: <adaptive-icon> elements require a sdk version of at least 26.
-         
+Execution failed for task ':app:compileReleaseKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
 
 * Try:
 > Run with --info or --debug option to get more log output.
@@ -54,7 +77,7 @@ Execution failed for task ':app:processReleaseResources'.
 > Get more help at https://help.gradle.org.
 
 * Exception is:
-org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:processReleaseResources'.
+org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:compileReleaseKotlin'.
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.lambda$executeIfValid$1(ExecuteActionsTaskExecuter.java:130)
 	at org.gradle.internal.Try$Failure.ifSuccessfulOrElse(Try.java:282)
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:128)
@@ -87,7 +110,7 @@ org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:pro
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:380)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
-Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionException: A failure occurred while executing com.android.build.gradle.internal.res.LinkApplicationAndroidResourcesTask$TaskAction
+Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionException: A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
 	at org.gradle.workers.internal.DefaultWorkerExecutor$WorkItemExecution.waitForCompletion(DefaultWorkerExecutor.java:287)
 	at org.gradle.internal.work.DefaultAsyncWorkTracker.lambda$waitForItemsAndGatherFailures$2(DefaultAsyncWorkTracker.java:130)
 	at org.gradle.internal.Factories$1.create(Factories.java:31)
@@ -163,7 +186,7 @@ Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionExcept
 	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:64)
 	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:43)
 	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.executeWithNonEmptySources(AbstractSkipEmptyWorkStep.java:125)
-	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:56)
+	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:61)
 	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:36)
 	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsStartedStep.execute(MarkSnapshottingInputsStartedStep.java:38)
 	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.execute(LoadPreviousExecutionStateStep.java:36)
@@ -214,20 +237,10 @@ Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionExcept
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:380)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
-Caused by: com.android.builder.internal.aapt.v2.Aapt2Exception: Android resource linking failed
-ERROR: /home/runner/work/G-IkokoRecap/G-IkokoRecap/app/src/main/res/mipmap-anydpi/ic_launcher.xml: AAPT: error: <adaptive-icon> elements require a sdk version of at least 26.
-    
-ERROR: /home/runner/work/G-IkokoRecap/G-IkokoRecap/app/src/main/res/mipmap-anydpi/ic_launcher_round.xml: AAPT: error: <adaptive-icon> elements require a sdk version of at least 26.
-    
-	at com.android.builder.internal.aapt.v2.Aapt2Exception$Companion.create(Aapt2Exception.kt:45)
-	at com.android.builder.internal.aapt.v2.Aapt2Exception$Companion.create$default(Aapt2Exception.kt:33)
-	at com.android.build.gradle.internal.res.Aapt2ErrorUtils.rewriteException(Aapt2ErrorUtils.kt:262)
-	at com.android.build.gradle.internal.res.Aapt2ErrorUtils.rewriteLinkException(Aapt2ErrorUtils.kt:133)
-	at com.android.build.gradle.internal.res.Aapt2ProcessResourcesRunnableKt.processResources(Aapt2ProcessResourcesRunnable.kt:76)
-	at com.android.build.gradle.internal.res.LinkApplicationAndroidResourcesTask$Companion.invokeAaptForSplit(LinkApplicationAndroidResourcesTask.kt:941)
-	at com.android.build.gradle.internal.res.LinkApplicationAndroidResourcesTask$Companion.access$invokeAaptForSplit(LinkApplicationAndroidResourcesTask.kt:796)
-	at com.android.build.gradle.internal.res.LinkApplicationAndroidResourcesTask$TaskAction.run(LinkApplicationAndroidResourcesTask.kt:432)
-	at com.android.build.gradle.internal.profile.ProfileAwareWorkAction.execute(ProfileAwareWorkAction.kt:74)
+Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
+	at org.jetbrains.kotlin.gradle.tasks.TasksUtilsKt.throwExceptionIfCompilationFailed(tasksUtils.kt:20)
+	at org.jetbrains.kotlin.compilerRunner.GradleKotlinCompilerWork.run(GradleKotlinCompilerWork.kt:141)
+	at org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction.execute(GradleCompilerRunnerWithWorkers.kt:73)
 	at org.gradle.workers.internal.DefaultWorkerServer.execute(DefaultWorkerServer.java:63)
 	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:66)
 	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:62)
@@ -258,5 +271,5 @@ ERROR: /home/runner/work/G-IkokoRecap/G-IkokoRecap/app/src/main/res/mipmap-anydp
 	... 2 more
 
 
-BUILD FAILED in 15s
-27 actionable tasks: 27 executed
+BUILD FAILED in 27s
+34 actionable tasks: 34 executed
