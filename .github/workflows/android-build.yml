@@ -27,7 +27,6 @@ jobs:
           gradle-version: '8.7'
 
       - name: Generate or restore signing keystore
-        id: signing
         shell: bash
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -74,13 +73,18 @@ jobs:
           TAG="v1.0.0"
           gh release create "$TAG" out/G-I-AI-release.apk \
             --title "G.I AI $TAG" \
-            --notes "G.I AI 1.0.0 - ChatGPT-style chat UI (neon cyber dark green), custom AI provider API key + free model filter, image/video/file upload via + button, background 3D animation video engine (AI writes Three.js -> frame render -> H.264 mp4 -> Downloads), Termux bridge (AI runs termux scripts), GitHub token access (read/write/create/delete + Actions dispatch), phone access permissions, 3D animated splash with Powered by I KO KO." \
+            --notes "G.I AI 1.0.0" \
             --target "$GITHUB_SHA" || gh release upload "$TAG" out/G-I-AI-release.apk --clobber
 
-      - name: Post build log on failure
+      - name: Commit build log on failure
         if: failure()
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh issue create --title "G.I AI build failed - debug log" --body-file build.log || true
+          tail -n 300 build.log > ci_log.md || echo "no build.log" > ci_log.md
+          git config user.name "giai-ci"
+          git config user.email "giai-ci@users.noreply.github.com"
+          git add ci_log.md
+          git commit -m "CI failure log [skip ci]"
+          git push origin HEAD:main || true
