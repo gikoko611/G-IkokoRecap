@@ -1,20 +1,14 @@
 package com.gikoko.giai
 
 import android.content.Intent
-import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
 import android.util.Base64
-import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.webkit.MimeTypeMap
 import android.widget.EditText
 import android.widget.HorizontalScrollView
-import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -70,7 +64,6 @@ class MainActivity : AppCompatActivity(), JobBus.Listener {
         root.orientation = LinearLayout.VERTICAL
         root.setBackgroundColor(Neon.BG)
 
-        // header
         val header = LinearLayout(this)
         header.orientation = LinearLayout.HORIZONTAL
         header.setPadding(Neon.dp(this, 16), Neon.dp(this, 12), Neon.dp(this, 16), Neon.dp(this, 12))
@@ -91,7 +84,6 @@ class MainActivity : AppCompatActivity(), JobBus.Listener {
         header.addView(gear)
         root.addView(header, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
-        // job status chip (background tools indicator)
         jobChip = Neon.label(this, "", 12f, Neon.GREEN)
         jobChip.background = getDrawable(R.drawable.bg_msg_user)
         jobChip.setPadding(Neon.dp(this, 12), Neon.dp(this, 6), Neon.dp(this, 12), Neon.dp(this, 6))
@@ -100,7 +92,6 @@ class MainActivity : AppCompatActivity(), JobBus.Listener {
         jw.setMargins(Neon.dp(this, 16), Neon.dp(this, 8), Neon.dp(this, 16), 0)
         root.addView(jobChip, jw)
 
-        // chat list
         list = LinearLayout(this)
         list.orientation = LinearLayout.VERTICAL
         list.setPadding(Neon.dp(this, 12), Neon.dp(this, 12), Neon.dp(this, 12), Neon.dp(this, 12))
@@ -109,7 +100,6 @@ class MainActivity : AppCompatActivity(), JobBus.Listener {
         scroll.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
         root.addView(scroll)
 
-        // attachment chips
         attachRow = LinearLayout(this)
         attachRow.orientation = LinearLayout.HORIZONTAL
         attachRow.setPadding(Neon.dp(this, 12), 0, Neon.dp(this, 12), 0)
@@ -118,7 +108,6 @@ class MainActivity : AppCompatActivity(), JobBus.Listener {
         attachBar.visibility = View.GONE
         root.addView(attachBar, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
-        // input row: [+] [edit] [send]
         val row = LinearLayout(this)
         row.orientation = LinearLayout.HORIZONTAL
         row.setPadding(Neon.dp(this, 10), Neon.dp(this, 8), Neon.dp(this, 10), Neon.dp(this, 10))
@@ -130,7 +119,7 @@ class MainActivity : AppCompatActivity(), JobBus.Listener {
         plus.gravity = Gravity.CENTER
         plus.background = getDrawable(R.drawable.bg_send)
         val pw = Neon.dp(this, 44)
-        plus.layoutParams = LinearLayout.LayoutParams(pw, pw).apply { setMargins(0, 0, Neon.dp(this, 8), Neon.dp(this, 2)) }
+        plus.layoutParams = LinearLayout.LayoutParams(pw, pw).apply { setMargins(0, 0, Neon.dp(applicationContext, 8), Neon.dp(applicationContext, 2)) }
         plus.setOnClickListener { showAttachMenu(plus) }
         row.addView(plus)
 
@@ -152,7 +141,7 @@ class MainActivity : AppCompatActivity(), JobBus.Listener {
         send.gravity = Gravity.CENTER
         send.background = getDrawable(R.drawable.bg_send)
         val sw = Neon.dp(this, 44)
-        send.layoutParams = LinearLayout.LayoutParams(sw, sw).apply { setMargins(Neon.dp(this, 8), 0, 0, Neon.dp(this, 2)) }
+        send.layoutParams = LinearLayout.LayoutParams(sw, sw).apply { setMargins(Neon.dp(applicationContext, 8), 0, 0, Neon.dp(applicationContext, 2)) }
         send.setOnClickListener { send() }
         row.addView(send)
         root.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
@@ -190,7 +179,7 @@ class MainActivity : AppCompatActivity(), JobBus.Listener {
                 val t = cr.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }?.take(20000)
                 attachments.add(Attach(name, null, t, false))
             } else {
-                val size = cr.openAssetFileDescriptor(uri)?.use { it.length } ?: -1
+                val size = cr.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1
                 attachments.add(Attach(name + " (" + (size / 1024) + " KB)", null, null, false))
             }
             renderAttachBar()
@@ -254,6 +243,7 @@ class MainActivity : AppCompatActivity(), JobBus.Listener {
                 synchronized(history) {
                     if (history.size > 12) msgs.addAll(history.subList(history.size - 12, history.size - 1))
                     else if (history.size > 1) msgs.addAll(history.subList(0, history.size - 1))
+                    Unit
                 }
                 val cur = history.last()
                 if (cur.imgB64 != null) msgs.add(AiClient.Msg("user", attachText(text, atts), cur.imgB64))
@@ -366,7 +356,7 @@ class MainActivity : AppCompatActivity(), JobBus.Listener {
         val note = Neon.label(this, "⬇ MP4 + frames ZIP + scene HTML သည် Downloads/GIAI ထဲ ရှိပြီး", 11f, Neon.DIM)
         val lpn = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         lpn.setMargins(Neon.dp(this, 24), 0, Neon.dp(this, 24), 0)
-        list.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(Neon.dp(this, 24), 2, Neon.dp(this, 24), 2) })
+        list.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(Neon.dp(applicationContext, 24), 2, Neon.dp(applicationContext, 24), 2) })
         list.addView(note, lpn)
         scrollBottom()
     }

@@ -35,7 +35,7 @@ object Neon {
     fun btn(c: Context, text: String, onClick: (View) -> Unit): Button {
         val b = Button(c)
         b.text = text
-        b.allCaps = false
+        b.transformationMethod = null
         b.textSize = 13f
         b.setTextColor(GREEN)
         b.background = ContextCompat.getDrawable(c, R.drawable.bg_card)
