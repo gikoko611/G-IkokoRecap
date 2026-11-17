@@ -52,7 +52,6 @@
         <activity
             android:name=".RenderHostActivity"
             android:exported="false"
-            android:screenOrientation="portrait"
             android:theme="@style/Theme.GIAI.Transparent" />
 
         <provider
