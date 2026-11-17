@@ -211,8 +211,8 @@ class SettingsActivity : AppCompatActivity() {
         txRow.orientation = LinearLayout.HORIZONTAL
         txRow.setPadding(Neon.dp(this, 16), Neon.dp(this, 8), Neon.dp(this, 16), 0)
         txRow.addView(Neon.btn(this, "▶ TEST COMMAND") {
-            val ok = TermuxClient.run(this, "echo G.I AI OK > ~/giai_test.txt && termux-toast 'G.I AI connected' 2>/dev/null; echo done")
-            Toast.makeText(this, if (ok) "▶ sent (Termux မျက်နှာပြင်မှာ စစ်ပါ)" else "⚠ Termux မရှိ", Toast.LENGTH_LONG).show()
+            val err = TermuxClient.run(this, "echo G.I AI OK > ~/giai_test.txt && termux-toast 'G.I AI connected' 2>/dev/null; echo done")
+            Toast.makeText(this, err ?: "▶ sent (Termux မျက်နှာပြင်မှာ စစ်ပါ)", Toast.LENGTH_LONG).show()
         })
         txRow.addView(Neon.btn(this, "📋 COPY SHARED PATH") {
             val cb = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -270,8 +270,10 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun updateTermuxStatus() {
-        statTermux.text = "Termux: " + (if (TermuxClient.installed(this)) "✅ installed" else "❌ not installed") +
+        val svc = TermuxClient.servicePackage(this)
+        statTermux.text = "Termux: " + (if (svc != null) "✅ installed ($svc)" else "❌ not installed") +
             "   Termux:API: " + (if (TermuxClient.apiInstalled(this)) "✅" else "❌") +
-            "\nShared folder: " + TermuxClient.SHARED_DIR
+            "\nShared folder: " + TermuxClient.SHARED_DIR +
+            (if (svc != null) "" else "\n⚠ Termux ကို F-Droid သို့မဟုတ် GitHub release ကနေ install လုပ်ပါ")
     }
 }

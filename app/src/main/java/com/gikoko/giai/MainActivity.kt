@@ -295,8 +295,8 @@ class MainActivity : AppCompatActivity(), JobBus.Listener {
     }
 
     private fun runTermux(code: String) {
-        val ok = TermuxClient.run(this, code)
-        Toast.makeText(this, if (ok) "▶ Termux ထဲ run နေပြီ" else "⚠ Termux မရှိ / allow-external-apps မဖွင့်ရသေး", Toast.LENGTH_LONG).show()
+        val err = TermuxClient.run(this, code)
+        Toast.makeText(this, err ?: "▶ Termux ထဲ run နေပြီ", Toast.LENGTH_LONG).show()
     }
 
     private fun addSaveCodeButton(lang: String, code: String) {
