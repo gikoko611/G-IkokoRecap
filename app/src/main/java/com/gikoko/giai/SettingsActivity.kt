@@ -40,7 +40,6 @@ class SettingsActivity : AppCompatActivity() {
         title.setPadding(Neon.dp(this, 16), 0, 0, Neon.dp(this, 8))
         root.addView(title)
 
-        // ---------- AI PROVIDER ----------
         root.addView(Neon.section(this, "🤖 AI PROVIDER (CUSTOM KEY + FREE FILTER)"))
         val inBase = Neon.input(this, "Base URL (OpenAI-compatible)", Prefs.aiBase)
         val inKey = Neon.input(this, "API Key", Prefs.aiKey, true)
@@ -84,7 +83,6 @@ class SettingsActivity : AppCompatActivity() {
         })
         root.addView(aiRow)
 
-        // ---------- GITHUB ----------
         root.addView(Neon.section(this, "🐙 GITHUB (TOKEN: READ / WRITE / CREATE / DELETE / ACTIONS)"))
         val inToken = Neon.input(this, "GitHub Personal Access Token (repo scope)", Prefs.ghToken, true)
         val inRepo = Neon.input(this, "Default repo (owner/name)", Prefs.ghRepo)
@@ -185,7 +183,6 @@ class SettingsActivity : AppCompatActivity() {
         })
         root.addView(ghRow3)
 
-        // ---------- PHONE ACCESS ----------
         root.addView(Neon.section(this, "📱 PHONE ACCESS (PERMISSIONS)"))
         statPerm = Neon.note(this, "")
         root.addView(statPerm)
@@ -206,7 +203,6 @@ class SettingsActivity : AppCompatActivity() {
         })
         root.addView(permRow)
 
-        // ---------- TERMUX ----------
         root.addView(Neon.section(this, "🖥 TERMUX BRIDGE (RUN ALL TERMUX TOOLS)"))
         statTermux = Neon.note(this, "")
         root.addView(statTermux)
@@ -215,8 +211,8 @@ class SettingsActivity : AppCompatActivity() {
         txRow.orientation = LinearLayout.HORIZONTAL
         txRow.setPadding(Neon.dp(this, 16), Neon.dp(this, 8), Neon.dp(this, 16), 0)
         txRow.addView(Neon.btn(this, "▶ TEST COMMAND") {
-            val ok = TermuxClient.run(this, "echo G.I AI OK > ~/giai_test.txt && termux-toast 'G.I AI connected' 2>/dev/null; echo done")
-            Toast.makeText(this, if (ok) "▶ sent (Termux မျက်နှာပြင်မှာ စစ်ပါ)" else "⚠ Termux မရှိ", Toast.LENGTH_LONG).show()
+            val err = TermuxClient.run(this, "echo G.I AI OK > ~/giai_test.txt && termux-toast 'G.I AI connected' 2>/dev/null; echo done")
+            Toast.makeText(this, err ?: "▶ sent (Termux မျက်နှာပြင်မှာ စစ်ပါ)", Toast.LENGTH_LONG).show()
         })
         txRow.addView(Neon.btn(this, "📋 COPY SHARED PATH") {
             val cb = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -225,7 +221,6 @@ class SettingsActivity : AppCompatActivity() {
         })
         root.addView(txRow)
 
-        // ---------- 3D ENGINE ----------
         root.addView(Neon.section(this, "🎬 3D RENDER ENGINE (THREE.JS + H.264)"))
         val inW = Neon.input(this, "Width px", Prefs.renderW.toString())
         val inH = Neon.input(this, "Height px", Prefs.renderH.toString())
@@ -236,7 +231,7 @@ class SettingsActivity : AppCompatActivity() {
             lp.setMargins(Neon.dp(this, 16), Neon.dp(this, 6), Neon.dp(this, 16), 0)
             root.addView(it, lp)
         }
-        root.addView(Neon.btn(this, "💾 SAVE 3D SETTINGS") {
+        val saveBtn = Neon.btn(this, "💾 SAVE 3D SETTINGS") {
             try {
                 Prefs.renderW = inW.text.toString().toInt().coerceIn(160, 1080)
                 Prefs.renderH = inH.text.toString().toInt().coerceIn(160, 1920)
@@ -244,11 +239,10 @@ class SettingsActivity : AppCompatActivity() {
                 Prefs.renderFrames = inFrames.text.toString().toInt().coerceIn(8, 600)
                 Toast.makeText(this, "saved", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) { Toast.makeText(this, "⚠ numbers only", Toast.LENGTH_SHORT).show() }
-        }.also { b ->
-            val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-            lp.setMargins(Neon.dp(this, 16), Neon.dp(this, 10), 0, 0)
-            b.layoutParams = lp
-        })
+        }
+        val sbLp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        sbLp.setMargins(Neon.dp(this, 16), Neon.dp(this, 10), 0, 0)
+        root.addView(saveBtn, sbLp)
 
         updatePermStatus()
         updateTermuxStatus()
@@ -276,8 +270,10 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun updateTermuxStatus() {
-        statTermux.text = "Termux: " + (if (TermuxClient.installed(this)) "✅ installed" else "❌ not installed") +
+        val svc = TermuxClient.servicePackage(this)
+        statTermux.text = "Termux: " + (if (svc != null) "✅ installed ($svc)" else "❌ not installed") +
             "   Termux:API: " + (if (TermuxClient.apiInstalled(this)) "✅" else "❌") +
-            "\nShared folder: " + TermuxClient.SHARED_DIR
+            "\nShared folder: " + TermuxClient.SHARED_DIR +
+            (if (svc != null) "" else "\n⚠ Termux ကို F-Droid သို့မဟုတ် GitHub release ကနေ install လုပ်ပါ")
     }
 }
