@@ -1,12 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.GIkokoRecap" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/gold</item>
-        <item name="colorPrimaryVariant">@color/gold_dark</item>
-        <item name="colorOnPrimary">@color/bg</item>
-        <item name="colorSecondary">@color/cyan</item>
-        <item name="colorOnSecondary">@color/bg</item>
-        <item name="android:windowBackground">@color/bg</item>
-        <item name="android:statusBarColor">@color/bg</item>
-        <item name="android:navigationBarColor">@color/bg</item>
+    <style name="Theme.GIAI" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:windowBackground">@color/bg_dark</item>
+        <item name="android:statusBarColor">@color/bg_dark</item>
+        <item name="android:navigationBarColor">@color/bg_dark</item>
+        <item name="colorPrimary">@color/neon_green</item>
+        <item name="colorOnPrimary">#03140C</item>
+        <item name="colorSurface">@color/bg_surface</item>
+    </style>
+
+    <style name="Theme.GIAI.Transparent" parent="Theme.GIAI">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
     </style>
 </resources>
